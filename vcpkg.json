@@ -1,0 +1,11 @@
+{
+  "name": "vulkan-tutorial",
+  "version-string": "1.0.0",
+  "builtin-baseline": "faadc334fd77bc965eb7be7c9034c4db5141b9f0",
+  "dependencies": [
+    "glfw3",
+    "glm",
+    "stb",
+    "imgui"
+  ]
+}
