@@ -83,11 +83,18 @@ const GLFWwindow* Engine::Renderer::GetGLFWwinow() const
     return m_Window;
 }
 
-void Engine::Renderer::Render(int count, const unsigned int* indices) const
+void Engine::Renderer::DrawElements(int count, const unsigned int* indices) const
+{
+    GLCALL(glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, indices));
+}
+
+void Engine::Renderer::OnRender() const
 {
     GLCALL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
-    GLCALL(glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, indices));
-    
+}
+
+void Engine::Renderer::Render() const
+{    
     glfwSwapBuffers(m_Window);
     glfwPollEvents();
 }

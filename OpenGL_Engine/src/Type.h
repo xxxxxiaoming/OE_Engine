@@ -35,6 +35,7 @@ namespace Engine
     struct Vertex
     {
         vec3 pos;
+		vec3 normal;
         vec2 texCoord;
         vec4 color;
         float textureSlot;
@@ -55,21 +56,25 @@ namespace Engine
 			Vertex& vertexLeftTop = vertices[3 + count * 4];
 
 			vertexLeftBottom.pos = { position.x, position.y, position.z };
+			vertexLeftBottom.normal = { 0.0f, 0.0f, 1.0f };
 			vertexLeftBottom.texCoord = { 0.0f, 0.0f };
 			vertexLeftBottom.color = { 1.0f, 1.0f, 0.0f, 1.0f };
 			vertexLeftBottom.textureSlot = 0.0f;
 
 			vertexRightBottom.pos = { position.x + w, position.y, position.z };
+			vertexRightBottom.normal = { 0.0f, 0.0f, 1.0f };
 			vertexRightBottom.texCoord = { 1.0f, 0.0f };
 			vertexRightBottom.color = { 1.0f, 1.0f, 0.0f, 1.0f };
 			vertexRightBottom.textureSlot = 0.0f;
 
 			vertexRightTop.pos = { position.x + w, position.y + h, position.z };
+			vertexRightTop.normal = { 0.0f, 0.0f, 1.0f };
 			vertexRightTop.texCoord = { 1.0f, 1.0f };
 			vertexRightTop.color = { 1.0f, 1.0f, 0.0f, 1.0f };
 			vertexRightTop.textureSlot = 0.0f;
 
 			vertexLeftTop.pos = { position.x, position.y + h, position.z };
+			vertexLeftTop.normal = { 0.0f, 0.0f, 1.0f };
 			vertexLeftTop.texCoord = { 0.0f, 1.0f };
 			vertexLeftTop.color = { 1.0f, 1.0f, 0.0f, 1.0f };
 			vertexLeftTop.textureSlot = 0.0f;
@@ -101,40 +106,40 @@ namespace Engine
 			int iOffset = count * 36;
 
 			// --- 1. 前面 (Front Face, +Z) ---
-			vertices[vOffset + 0] = { {center.x - wH, center.y - hH, center.z + dH}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 1] = { {center.x + wH, center.y - hH, center.z + dH}, {1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 2] = { {center.x + wH, center.y + hH, center.z + dH}, {1.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 3] = { {center.x - wH, center.y + hH, center.z + dH}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 0] = { {center.x - wH, center.y - hH, center.z + dH}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 1] = { {center.x + wH, center.y - hH, center.z + dH}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 2] = { {center.x + wH, center.y + hH, center.z + dH}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 3] = { {center.x - wH, center.y + hH, center.z + dH}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
 
 			// --- 2. 后面 (Back Face, -Z) ---
-			vertices[vOffset + 4] = { {center.x - wH, center.y - hH, center.z - dH}, {1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 5] = { {center.x - wH, center.y + hH, center.z - dH}, {1.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 6] = { {center.x + wH, center.y + hH, center.z - dH}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 7] = { {center.x + wH, center.y - hH, center.z - dH}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 4] = { {center.x - wH, center.y - hH, center.z - dH}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 5] = { {center.x - wH, center.y + hH, center.z - dH}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 6] = { {center.x + wH, center.y + hH, center.z - dH}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 7] = { {center.x + wH, center.y - hH, center.z - dH}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
 
 			// --- 3. 左面 (Left Face, -X) ---
-			vertices[vOffset + 8]  = { {center.x - wH, center.y - hH, center.z - dH}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 9]  = { {center.x - wH, center.y - hH, center.z + dH}, {1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 10] = { {center.x - wH, center.y + hH, center.z + dH}, {1.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 11] = { {center.x - wH, center.y + hH, center.z - dH}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 8] = { {center.x - wH, center.y - hH, center.z - dH}, {-1.0f, 0.0f, 0.0f}, { 0.0f, 0.0f }, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 9]  = { {center.x - wH, center.y - hH, center.z + dH}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 10] = { {center.x - wH, center.y + hH, center.z + dH}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 11] = { {center.x - wH, center.y + hH, center.z - dH}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
 
 			// --- 4. 右面 (Right Face, +X) ---
-			vertices[vOffset + 12] = { {center.x + wH, center.y - hH, center.z + dH}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 13] = { {center.x + wH, center.y - hH, center.z - dH}, {1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 14] = { {center.x + wH, center.y + hH, center.z - dH}, {1.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 15] = { {center.x + wH, center.y + hH, center.z + dH}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 12] = { {center.x + wH, center.y - hH, center.z + dH}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 13] = { {center.x + wH, center.y - hH, center.z - dH}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 14] = { {center.x + wH, center.y + hH, center.z - dH}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 15] = { {center.x + wH, center.y + hH, center.z + dH}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
 
 			// --- 5. 上面 (Top Face, +Y) ---
-			vertices[vOffset + 16] = { {center.x - wH, center.y + hH, center.z + dH}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 17] = { {center.x + wH, center.y + hH, center.z + dH}, {1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 18] = { {center.x + wH, center.y + hH, center.z - dH}, {1.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 19] = { {center.x - wH, center.y + hH, center.z - dH}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 16] = { {center.x - wH, center.y + hH, center.z + dH}, {0.0f, 1.0f, 0.0f}, { 0.0f, 0.0f }, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 17] = { {center.x + wH, center.y + hH, center.z + dH}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 18] = { {center.x + wH, center.y + hH, center.z - dH}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 19] = { {center.x - wH, center.y + hH, center.z - dH}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
 
 			// --- 6. 下面 (Bottom Face, -Y) ---
-			vertices[vOffset + 20] = { {center.x - wH, center.y - hH, center.z - dH}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 21] = { {center.x + wH, center.y - hH, center.z - dH}, {1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 22] = { {center.x + wH, center.y - hH, center.z + dH}, {1.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
-			vertices[vOffset + 23] = { {center.x - wH, center.y - hH, center.z + dH}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 20] = { {center.x - wH, center.y - hH, center.z - dH}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 21] = { {center.x + wH, center.y - hH, center.z - dH}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 22] = { {center.x + wH, center.y - hH, center.z + dH}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
+			vertices[vOffset + 23] = { {center.x - wH, center.y - hH, center.z + dH}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 0.0f };
 
 			// --- 设置 12 个三角形的索引 (每个面 2 个) ---
 			for (int face = 0; face < 6; face++)

@@ -31,7 +31,9 @@ namespace  Engine
         void EnableDepthTest() const;
         void DisableDepthTest() const;
         
-        void Render(int count, const unsigned int* indices) const;
+        void DrawElements(int count, const unsigned int* indices) const;
+        void OnRender() const;
+        void Render() const;
         void Clear() const {glfwTerminate();}
         
         /* 加入到 dataBufferArray 的 data buffer 在运行结束时无需手动 delete buffer */

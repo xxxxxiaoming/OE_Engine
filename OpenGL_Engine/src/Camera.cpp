@@ -1,6 +1,6 @@
 ﻿#include "Camera.h"
 
-Engine::Camera::Camera(glm::vec3 position, glm::mat4 rotate) : 
+Engine::Camera::Camera(const glm::vec3& position, const glm::mat4& rotate) : 
     m_Position(position)
 {
     glm::mat4 translate = glm::translate(glm::mat4(1.0f), glm::vec3(position.x, position.y, position.z));
@@ -9,14 +9,14 @@ Engine::Camera::Camera(glm::vec3 position, glm::mat4 rotate) :
     m_Right = translate * rotate * glm::vec4(m_Right, 1.0f);
 }
 
-Engine::Camera::Camera(glm::vec3 position, glm::vec3 look, glm::vec3 up) :
+Engine::Camera::Camera(const glm::vec3& position, const glm::vec3& look, const glm::vec3& up) :
     m_Position(position), m_Up(up)
 {
     m_Front = glm::normalize(look - position);
     m_Right = glm::normalize(glm::cross(m_Front, m_Up));
 }
 
-Engine::Camera::Camera(glm::vec3 position, float pitch, float yaw, float roll) :
+Engine::Camera::Camera(const glm::vec3& position, float pitch, float yaw, float roll) :
     m_Position(position)
 {
     glm::mat4 rotate = glm::mat4(1.0f);

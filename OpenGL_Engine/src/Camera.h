@@ -18,11 +18,12 @@ namespace Engine
 		bool m_Possessed = false;
         std::mutex m_Mutex;
         
-        Camera(glm::vec3 position, glm::mat4 rotate);
-        Camera(glm::vec3 position, glm::vec3 look, glm::vec3 up);
-        Camera(glm::vec3 position, float pitch, float yaw, float roll);
+        Camera(const glm::vec3& position, const glm::mat4& rotate);
+        Camera(const glm::vec3& position, const glm::vec3& look, const glm::vec3& up);
+        Camera(const glm::vec3& position, float pitch, float yaw, float roll);
     
         glm::mat4 GetViewMatrix() const;
+		glm::vec3 GetPosition() const { return m_Position; }
         
         inline void SetSpeed(float moveSpeed, float rotateSpeed) {  m_MoveSpeed = moveSpeed; m_RotateSpeed = rotateSpeed; };
         

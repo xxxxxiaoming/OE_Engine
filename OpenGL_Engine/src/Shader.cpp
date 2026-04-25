@@ -1,4 +1,4 @@
-#include <glad/glad.h>
+﻿#include <glad/glad.h>
 #include <fstream>
 #include <sstream>
 #include <cstdio>
@@ -210,6 +210,26 @@ void Engine::Shader::SetUniform1f(const std::string& name, const float value)
     }
 }
 
+void Engine::Shader::SetUniform3f(const std::string& name, const float value1, const float value2, const float value3)
+{
+    if (m_UniformLocations.find(name) != m_UniformLocations.end())
+    {
+        int loc = m_UniformLocations[name];
+        GLCALL(glUniform3f(loc, value1, value2, value3));
+    }
+    else if (!name.empty())
+    {
+        int loc = GetUniformLocation(name);
+        ASSERT(loc != -1);
+        
+        if (loc != -1)
+        {
+            m_UniformLocations[name] = loc;
+            GLCALL(glUniform3f(loc, value1, value2, value3));
+        }
+    }
+}
+
 void Engine::Shader::SetUniform4f(const std::string& name, const float value1, const float value2, const float value3, const float value4)
 {
     if (m_UniformLocations.find(name) != m_UniformLocations.end())
@@ -228,6 +248,27 @@ void Engine::Shader::SetUniform4f(const std::string& name, const float value1, c
             GLCALL(glUniform3f(loc, value1, value2, value3));
         }
     }
+}
+
+
+void Engine::Shader::SetUniformMatrix3f(const std::string& name, const glm::mat3& value)
+{
+    if (m_UniformLocations.find(name) != m_UniformLocations.end())
+    {
+        int loc = m_UniformLocations[name];
+        GLCALL(glUniformMatrix3fv(loc, 1, GL_FALSE, &value[0][0]));
+    }
+    else if (!name.empty())
+    {
+        int loc = GetUniformLocation(name);
+        ASSERT(loc != -1);
+        
+        if (loc != -1)
+        {
+            m_UniformLocations[name] = loc;
+            GLCALL(glUniformMatrix3fv(loc, 1, GL_FALSE, &value[0][0]));
+        }
+    }   
 }
 
 void Engine::Shader::SetUniformMatrix4f(const std::string& name, const glm::mat4& value)
@@ -266,6 +307,26 @@ void Engine::Shader::SetUniform1iv(const std::string& name, int count, const int
         {
             m_UniformLocations[name] = loc;
             GLCALL(glUniform1iv(loc, count, value));
+        }
+    }
+}
+
+void Engine::Shader::SetUniform1fv(const std::string& name, int count, const float* value)
+{
+    if (m_UniformLocations.find(name) != m_UniformLocations.end())
+    {
+        int loc = m_UniformLocations[name];
+        GLCALL(glUniform1fv(loc, count, value));
+    }
+    else
+    {
+        int loc = GetUniformLocation(name);
+        ASSERT(loc != -1);
+
+        if (loc != -1)
+        {
+            m_UniformLocations[name] = loc;
+            GLCALL(glUniform1fv(loc, count, value));
         }
     }
 }

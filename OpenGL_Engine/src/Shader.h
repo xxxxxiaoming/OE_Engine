@@ -26,10 +26,14 @@ namespace Engine
         
         void SetUniform1i(const std::string& name , const int value = 0);
         void SetUniform1f(const std::string& name, const float value = 0.0f);
+        void SetUniform3f(const std::string& name, const float value1 = 0.0f, const float value2 = 0.0f, const float value3 = 0.0f);
         void SetUniform4f(const std::string& nam, const float value1 = 0.0f, const float value2 = 0.0f, const float value3 = 0.0f, const float value4 = 0.0f);
+        
+		void SetUniformMatrix3f(const std::string& name, const glm::mat3& value);
         void SetUniformMatrix4f(const std::string& name, const glm::mat4& value);
         
         void SetUniform1iv(const std::string& name, int count, const int* value);
+        void SetUniform1fv(const std::string& name, int count, const float* value);
         
         int GetUniformLocation(const std::string& name = std::string{""}) const;
     };
