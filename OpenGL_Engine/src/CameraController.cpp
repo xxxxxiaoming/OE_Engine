@@ -26,7 +26,7 @@ void Engine::CameraController::UnBindKey(const Operations op)
 	m_KeyMap[op] = -1;
 }
 
-void Engine::CameraController::PossesCamera(Camera* camera)
+void Engine::CameraController::PossessCamera(Camera* camera)
 {
 	if (camera->m_Possessed)
 		return;

@@ -1,9 +1,9 @@
 #include <glad/glad.h>
-#include "VertexAtrribArray.h"
+#include "VertexAttribArray.h"
 #include "Helper.h"
 
 
-void Engine::VertexAtrribArray::SetPointer(unsigned int index, int size, int type ,int normalized, int stride, int pointer)
+void Engine::VertexAttribArray::SetPointer(unsigned int index, int size, int type ,int normalized, int stride, int pointer)
 {
     /* 参数列表
     ** void glVertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid * pointer);
@@ -24,12 +24,12 @@ void Engine::VertexAtrribArray::SetPointer(unsigned int index, int size, int typ
         GLCALL(glVertexAttribPointer(index, size, type, normalized, stride, (const void*)pointer));
 }
 
-void Engine::VertexAtrribArray::Enable(unsigned int index)
+void Engine::VertexAttribArray::Enable(unsigned int index)
 {
     GLCALL(glEnableVertexAttribArray(index));    
 }
 
-void Engine::VertexAtrribArray::Disable(unsigned int index)
+void Engine::VertexAttribArray::Disable(unsigned int index)
 {
     GLCALL(glDisableVertexAttribArray(index));
 }

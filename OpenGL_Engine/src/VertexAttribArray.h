@@ -2,10 +2,10 @@
 
 namespace Engine
 {
-    class VertexAtrribArray
+    class VertexAttribArray
     {
     public:
-        VertexAtrribArray() = delete;
+        VertexAttribArray() = delete;
         
         static void SetPointer(unsigned int index, int size, int type, int normalized, int stride, int pointer);
         

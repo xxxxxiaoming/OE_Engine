@@ -33,25 +33,48 @@ int main()
 	camController.BindKey(Engine::Operations::LookLeft, GLFW_KEY_LEFT);
 	camController.BindKey(Engine::Operations::LookRight, GLFW_KEY_RIGHT);
 
-	/* Posses camera */
-	camController.PossesCamera(&cam);
+	/* Possess camera */
+	camController.PossessCamera(&cam);
 	
-	/* Asset */
-	Engine::Vertex cubeVertices[24];
-	Engine::vec3 centers[1] = {
+	/* Cube */
+	Engine::Vertex cubeVertices[48];
+	Engine::vec3 centers[2] = {
 		Engine::vec3{0.0f, 0.0f, 0.0f},
+		Engine::vec3{100.0f, 0.0f, -270.0f}
 	};
-	float widths[1] {70.0f};
-	float heights[1] {70.0f};
-	float depths[1] {70.0f};
-	int cubeIndices[36];
-	float textureSlot = 0.0f;
-	const float cubeRotateSpeed = 17.0f;
 	
-	Engine::CreateCube<1>(centers, widths, heights, depths, cubeVertices, cubeIndices);
+	/* Shader */
+	std::string vsFilePath = "res/shader/VSShader.vert";
+	std::string fsFilePath = "res/shader/PhongLightShader.frag";
 
+	/* Texture */
+	std::string textures[6] = {
+		std::string{"res/texture/AO_Logo_Square.png"},
+		std::string{"res/texture/Roland-Garros-logo.png"},
+		std::string{"res/texture/US_OPEN_Logo.png"},
+		std::string{"res/texture/wimbledon-logo.png"},
+		std::string{"res/texture/container2.png"},
+		std::string{"res/texture/container2_specular.png"},
+	};
+	const int textureSlots[6] = { 0, 1, 2, 3, 4, 5 };
+
+	/* Material */
+	Engine::Material cubeMaterial{ vsFilePath, fsFilePath, textures, textureSlots, 6 };
+	
+	/* Size */
+	float widths[2] {70.0f, 70.0f};
+	float heights[2] {70.0f, 70.0f};
+	float depths[2] {70.0f, 70.0f};
+	int cubeIndices[72];
+	float textureSlot = 0.0f;
+	const float cubeRotateSpeed = 0.0f;
+	
+	Engine::CreateCube<2>(centers, widths, heights, depths, cubeVertices, cubeIndices);
 	for(auto& vertex : cubeVertices)
 		vertex.textureSlot = textureSlot;
+
+	Engine::Object cube{ cubeVertices, cubeIndices, 48, 72};
+	cube.BindMaterial(&cubeMaterial);
 
 	/* Light */
 	glm::vec3 lightPosition(0.0f, 0.0f, 0.0f);
@@ -59,10 +82,19 @@ int main()
 	Engine::vec3 lightCenters[1] = {
 		{lightPosition.x, lightPosition.y, lightPosition.z},
 	};
+	
+	/* Shader */
+	std::string lightVSFilePath = "res/shader/VSShaderLight.vert";
+	std::string lightFSFilePath = "res/shader/FSShaderLight.frag";
+
+	/* Material */
+	Engine::Material lightMaterial{ lightVSFilePath, lightFSFilePath, nullptr, nullptr, 0 };
+	
+	/* Size */
 	float widthsL[1]{ 20.0f };
 	float heightsL[1]{ 20.0f };
 	float depthsL[1]{ 20.0f };
-	float lightColor[3]{ 0.7f, 0.7f, 0.1f };
+	float lightColor[3]{ 1.0f, 1.0f, 1.0f };
 
 	Engine::CreateCube<1>(lightCenters, widthsL, heightsL, depthsL, lightVertices, cubeIndices);
 
@@ -70,82 +102,56 @@ int main()
 	{
 		vertex.color = { lightColor[0], lightColor[1], lightColor[2], 1.0f };
 	}
+
+	Engine::Object light{ lightVertices, cubeIndices, 24, 36};
+	light.BindMaterial(&lightMaterial);
 	
-	glm::mat4 modelMatLight = glm::translate(glm::mat4(1.0f), glm::vec3(70, 0, -70));
+	glm::mat4 modelMatLight = glm::translate(glm::mat4(1.0f), glm::vec3(70, 40, 0));
 	glm::mat4 modelMat = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -170));
 	glm::mat4 viewMat = cam.GetViewMatrix();
 	glm::mat4 projectionMat = glm::perspective(glm::radians(45.0f), 640.0f/360.0f, 0.1f, 3000.0f);
 	glm::mat3 normalMat = glm::transpose(glm::inverse(glm::mat3(modelMat)));
-
 	glm::vec3 lightWorldPos = modelMatLight * glm::vec4(lightPosition, 1.0f);
 
-	/* Object */
-	Engine::VertexArrayBuffer VAO{};
-	Engine::VertexBuffer VBO{};
-	Engine::IndexBuffer IBO{};
-
-	/* Rectangle vertex attribute buffer(VAO) */
-	VAO.Bind();
-
-	/* Rectangle vertex data buffer(VBO MUST BE BIND INSIDE VAO!) */
-	VBO.Bind();
-	VBO.SetBufferData(sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
-
-	/* Rectangle vertex indices buffer (IBO MUST BE BIND INSIDE VAO) */
-	IBO.Bind();
-	IBO.SetBufferData(sizeof(cubeIndices), cubeIndices, GL_STATIC_DRAW);
-
-	/* Shader */
-	std::string vsFilePath = "res/shader/VSShader.vert";
-	std::string fsFilePath = "res/shader/FSShader.frag";
-	Engine::Shader shader{ vsFilePath, fsFilePath };
+	Engine::Shader& shader = cubeMaterial.GetShader();
+	shader.Use();
 	
-	/* Texture */
-	Engine::Texture textureAO{std::string{"res/texture/AO_Logo_Square.png"}};
-	Engine::Texture textureRG{std::string{"res/texture/Roland-Garros-logo.png"}};
-	Engine::Texture textureUSO{std::string{"res/texture/US_OPEN_Logo.png"}};
-	Engine::Texture textureWim{ std::string{"res/texture/wimbledon-logo.png"} };
+	shader.SetUniform1i("u_Material.diffuse", 4);
+	shader.SetUniform1i("u_Material.specular", 5);
+	shader.SetUniform1i("u_Material.shininess", 64);
+
+	/* 配置光照 */
+	shader.SetUniform1i("u_LightConfig.enableDirectionLight", 1);
+	shader.SetUniform1i("u_LightConfig.pointLightNum", 1);
+	shader.SetUniform1i("u_LightConfig.spotLightNum", 1);
+
+	/* 方向光配置 */
+	shader.SetUniform3f("u_DirectionLight.direction", 1.0f, 1.0f, 1.0f);
+	shader.SetUniform3f("u_DirectionLight.color.ambient", 0.1f, 0.1f, 0.1f);
+	shader.SetUniform3f("u_DirectionLight.color.diffuse", 1.0f, 1.0f, 1.0f);
+	shader.SetUniform3f("u_DirectionLight.color.specular", 0.5f, 0.5f, 0.5f);
+
+	/* 点光源配置 */
+	shader.SetUniform3f("u_PointLights[0].position", lightWorldPos.x, lightWorldPos.y, lightWorldPos.z);
+	shader.SetUniform1f("u_PointLights[0].constant", 1.0f);
+	shader.SetUniform1f("u_PointLights[0].linear", 0.001f);
+	shader.SetUniform1f("u_PointLights[0].quadratic", 0.0001f);
+	shader.SetUniform3f("u_PointLights[0].color.ambient", 0.1f, 0.1f, 0.1f);
+	shader.SetUniform3f("u_PointLights[0].color.diffuse", 0.5f, 0.5f, 0.5f);
+	shader.SetUniform3f("u_PointLights[0].color.specular", 1.0f, 1.0f, 1.0f);
+
+	/* 聚光源配置 */
+	shader.SetUniform1f("u_SpotLights[0].innerAngle", glm::radians(5.0f));
+	shader.SetUniform1f("u_SpotLights[0].outterAngle", glm::radians(10.0f));
+	shader.SetUniform1f("u_SpotLights[0].constant", 1.0f);
+	shader.SetUniform1f("u_SpotLights[0].linear", 0.001f);
+	shader.SetUniform1f("u_SpotLights[0].quadratic", 0.0001f);
+	shader.SetUniform3f("u_SpotLights[0].color.ambient", 0.1f, 0.1f, 0.1f);
+	shader.SetUniform3f("u_SpotLights[0].color.diffuse", 1.0f, 1.0f, 1.0f);
+	shader.SetUniform3f("u_SpotLights[0].color.specular", 1.0f, 1.0f, 1.0f);
+
+	shader.UnUse();
 	
-	int textureSlots[4] = { 0,1,2,3 };
-	textureAO.Bind(0);
-	textureRG.Bind(1);
-	textureUSO.Bind(2);
-	textureWim.Bind(3);
-
-	Engine::VertexAtrribArray::Enable(0);
-	Engine::VertexAtrribArray::Enable(1);
-	Engine::VertexAtrribArray::Enable(2);
-	Engine::VertexAtrribArray::Enable(3);
-
-	Engine::VertexAtrribArray::SetPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Engine::Vertex), offsetof(Engine::Vertex, pos));
-	Engine::VertexAtrribArray::SetPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Engine::Vertex), offsetof(Engine::Vertex, texCoord));
-	Engine::VertexAtrribArray::SetPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Engine::Vertex), offsetof(Engine::Vertex, textureSlot));
-	Engine::VertexAtrribArray::SetPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Engine::Vertex), offsetof(Engine::Vertex, normal));
-	VAO.Unbind();
-
-	/* Light */
-	Engine::VertexArrayBuffer lightVAO{};
-	Engine::VertexBuffer lightVBO{};
-	Engine::IndexBuffer lightIBO{};
-
-	lightVAO.Bind();
-
-	lightVBO.Bind();
-	lightVBO.SetBufferData(sizeof(lightVertices), lightVertices, GL_STATIC_DRAW);
-
-	lightIBO.Bind();
-	lightIBO.SetBufferData(sizeof(cubeIndices), cubeIndices, GL_STATIC_DRAW);
-
-	std::string lightVSFilePath = "res/shader/VSShaderLight.vert";
-	std::string lightFSFilePath = "res/shader/FSShaderLight.frag";
-	Engine::Shader lightShader{ lightVSFilePath, lightFSFilePath };
-
-	Engine::VertexAtrribArray::Enable(0);
-	Engine::VertexAtrribArray::Enable(1);
-	Engine::VertexAtrribArray::SetPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Engine::Vertex), offsetof(Engine::Vertex, pos));
-	Engine::VertexAtrribArray::SetPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Engine::Vertex), offsetof(Engine::Vertex, color));
-	lightVAO.Unbind();
-
 	double lastFrame = glfwGetTime();	
 	while (!renderer.CheckWindowShouldClose())
 	{
@@ -161,55 +167,41 @@ int main()
 		normalMat = glm::transpose(glm::inverse(glm::mat3(modelMat)));
 
 		renderer.OnRender();
-
-		/* Draw Object */
-		VAO.Bind();
-		shader.Use();
 		
-		
-		/* Set shader uniform */
 		glm::vec3 camPosRealTime = cam.GetPosition();
+		glm::vec3 camFrontRealTime = cam.GetFront();
+
+		cube.OnDraw();
+		
 		shader.SetUniformMatrix4f("u_Model", modelMat);
 		shader.SetUniformMatrix4f("u_View", viewMat);
 		shader.SetUniformMatrix4f("u_Projection", projectionMat);
 		shader.SetUniformMatrix3f("u_NormalMat", normalMat);
-		shader.SetUniform1iv("u_Texture", sizeof(textureSlots) / sizeof(int), textureSlots);
 		shader.SetUniform3f("u_CameraPosition", camPosRealTime.x, camPosRealTime.y, camPosRealTime.z);
-		shader.SetUniform3f("u_LightPosition", lightWorldPos.x, lightWorldPos.y, lightWorldPos.z);
-		shader.SetUniform3f("u_LightColor", lightColor[0], lightColor[1], lightColor[2]);
 		
+		/* 每帧更新聚光源的位置，模拟控制手电筒^-^ */
+		shader.SetUniform3f("u_SpotLights[0].position", camPosRealTime.x, camPosRealTime.y, camPosRealTime.z);
+		shader.SetUniform3f("u_SpotLights[0].direction", camFrontRealTime.x, camFrontRealTime.y, camFrontRealTime.z);
+
 		renderer.DrawElements(sizeof(cubeIndices) / sizeof(int), nullptr);
-		shader.UnUse();
 
 		/* Draw Light */
-		lightVAO.Bind();
-		lightShader.Use();
-
+		light.OnDraw();
+		Engine::Shader& lightShader = lightMaterial.GetShader();
 		lightShader.SetUniformMatrix4f("u_Model", modelMatLight);
 		lightShader.SetUniformMatrix4f("u_View", viewMat);
 		lightShader.SetUniformMatrix4f("u_Projection", projectionMat);
 
 		renderer.DrawElements(sizeof(lightVertices) / sizeof(int), nullptr);
-		lightShader.UnUse();
 
 		renderer.Render();
 	}
 
-	textureAO.Delete();
-	textureRG.Delete();
-	textureWim.Delete();
-	textureUSO.Delete();
-	
-	shader.Delete();
-	lightShader.Delete();
-	
-	IBO.DeleteBuffer();
-	VBO.DeleteBuffer();
-	VAO.Delete();
-	
-	lightIBO.DeleteBuffer();
-	lightVBO.DeleteBuffer();
-	lightVAO.Delete();
+	cube.Destroy();
+	light.Destroy();
+
+	cubeMaterial.Delete();
+	lightMaterial.Delete();
 	
 	renderer.Clear();
 

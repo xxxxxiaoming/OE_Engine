@@ -1,14 +1,21 @@
 ﻿#include <glad/glad.h>
 #include <stb_image.h>
+#include <cstdio>
 #include "Texture.h"
 #include "Helper.h"
+
+Engine::Texture::Texture() :
+	m_FileName(std::string{ "" }), m_GLTextureID(0), m_Width(0), m_Height(0), m_BPP(0)
+{
+    printf("Default Constructor.");
+}
 
 Engine::Texture::Texture(const std::string& fileName) : m_FileName(fileName)
 {
     /* 垂直翻转图片，使图片的坐标原点在左下角 */
     stbi_set_flip_vertically_on_load(1);
     /* load texture image */
-    m_TextLocalBuffer = stbi_load(fileName.c_str(), &m_Width, &m_Height,&m_BPP, 4);
+    unsigned char* textLocalBuffer = stbi_load(fileName.c_str(), &m_Width, &m_Height,&m_BPP, 4);
     
     /* Create texture buffer and bind buffer to operate */
     GLCALL(glGenTextures(1, &m_GLTextureID));
@@ -21,11 +28,11 @@ Engine::Texture::Texture(const std::string& fileName) : m_FileName(fileName)
     GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));/* 设置纹理的竖向填充方式（纹理的竖向比例与viewport比例不适配），GL_CLAMP_TO_EDGE 平铺 */
     
     /* Send texture data to texture buffer */
-    GLCALL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_Width, m_Height, 0, GL_RGBA, GL_UNSIGNED_BYTE, m_TextLocalBuffer));
+    GLCALL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_Width, m_Height, 0, GL_RGBA, GL_UNSIGNED_BYTE, textLocalBuffer));
     GLCALL(glGenerateMipmap(GL_TEXTURE_2D));
     
-    if (m_TextLocalBuffer != nullptr)
-        stbi_image_free(m_TextLocalBuffer);
+    if (textLocalBuffer != nullptr)
+        stbi_image_free(textLocalBuffer);
 }
 
 Engine::Texture::~Texture()
@@ -45,9 +52,10 @@ void Engine::Texture::Delete()
     }
 }
 
-void Engine::Texture::Bind(int slot) const
+void Engine::Texture::Bind(int slot)
 {
     /* OpenGL 支持处理多张纹理，通过给不同纹理插槽绑定不同的纹理缓冲区，下面两句代码需要成对出现，意味着，将m_TextureID这个纹理缓冲区绑定到GL_TEXTURE0 + slot 这个纹理插槽上去 */
+    m_Slot = slot;
     GLCALL(glActiveTexture(GL_TEXTURE0 + slot));
     GLCALL(glBindTexture(GL_TEXTURE_2D, m_GLTextureID));
     /* 现代OpenGL(OpenGL 4.5及之后)提供了有一个合二为一的API */
@@ -57,4 +65,19 @@ void Engine::Texture::Bind(int slot) const
 void Engine::Texture::UnBind() const
 {
     GLCALL(glBindTexture(GL_TEXTURE_2D, 0));
+}
+
+void Engine::Texture::PrintTextureLimitInfo()
+{
+    int maxVertexTextureImageUnits = 0;
+	int maxFragmentTextureImageUnits = 0;
+	int maxCombinedTextureImageUnits = 0;
+
+	GLCALL(glGetIntegerv(GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS, &maxVertexTextureImageUnits));
+	GLCALL(glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxFragmentTextureImageUnits));
+	GLCALL(glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &maxCombinedTextureImageUnits));
+
+    printf("Max vertex shader texture limit: %d", maxVertexTextureImageUnits);
+	printf("Max fragment shader texture limit: %d", maxFragmentTextureImageUnits);
+	printf("Max combined texture limit: %d", maxCombinedTextureImageUnits);
 }

@@ -28,7 +28,7 @@ namespace Engine
 		inline void SetMoveSpeed(float moveSpeed) { m_MoveSpeed = moveSpeed; }
 		inline void SetRotateSpeed(float rotateSpeed) { m_RotateSpeed = rotateSpeed; }
 
-		void PossesCamera(Camera* camera);
+		void PossessCamera(Camera* camera);
 		void UnPossesCamera();
 		void ProcessInput(float deltaTime) const;
 	};

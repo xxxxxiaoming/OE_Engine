@@ -6,11 +6,6 @@
 #include "Shader.h"
 #include "Helper.h"
 
-Engine::Shader::Shader()
-{
-    CreateShader();
-}
-
 Engine::Shader::Shader(const std::string& vsFile, const std::string& fsFile)
 {
     CreateShaderInternal(vsFile, fsFile);
@@ -180,7 +175,7 @@ void Engine::Shader::SetUniform1i(const std::string& name, const int value)
     else if (!name.empty())
     {
         int loc = GetUniformLocation(name);
-        ASSERT(loc != -1);
+        //ASSERT(loc != -1);
         
         if (loc != -1)
         {
@@ -200,7 +195,7 @@ void Engine::Shader::SetUniform1f(const std::string& name, const float value)
     else if (!name.empty())
     {
         int loc = GetUniformLocation(name);
-        ASSERT(loc != -1);
+        //ASSERT(loc != -1);
         
         if (loc != -1)
         {
@@ -220,7 +215,7 @@ void Engine::Shader::SetUniform3f(const std::string& name, const float value1, c
     else if (!name.empty())
     {
         int loc = GetUniformLocation(name);
-        ASSERT(loc != -1);
+        //ASSERT(loc != -1);
         
         if (loc != -1)
         {
@@ -240,7 +235,7 @@ void Engine::Shader::SetUniform4f(const std::string& name, const float value1, c
     else if (!name.empty())
     {
         int loc = GetUniformLocation(name);
-        ASSERT(loc != -1);
+        //ASSERT(loc != -1);
         
         if (loc != -1)
         {
@@ -261,7 +256,7 @@ void Engine::Shader::SetUniformMatrix3f(const std::string& name, const glm::mat3
     else if (!name.empty())
     {
         int loc = GetUniformLocation(name);
-        ASSERT(loc != -1);
+        //ASSERT(loc != -1);
         
         if (loc != -1)
         {
@@ -281,7 +276,7 @@ void Engine::Shader::SetUniformMatrix4f(const std::string& name, const glm::mat4
     else if (!name.empty())
     {
         int loc = GetUniformLocation(name);
-        ASSERT(loc != -1);
+        //ASSERT(loc != -1);
         
         if (loc != -1)
         {
@@ -301,7 +296,7 @@ void Engine::Shader::SetUniform1iv(const std::string& name, int count, const int
     else
     {
         int loc = GetUniformLocation(name);
-        ASSERT(loc != -1);
+        //ASSERT(loc != -1);
         
         if (loc != -1)
         {
@@ -321,7 +316,7 @@ void Engine::Shader::SetUniform1fv(const std::string& name, int count, const flo
     else
     {
         int loc = GetUniformLocation(name);
-        ASSERT(loc != -1);
+        //ASSERT(loc != -1);
 
         if (loc != -1)
         {
@@ -336,7 +331,7 @@ int Engine::Shader::GetUniformLocation(const std::string& name) const
     if (not name.empty())
     {
         GLCALL(int loc = glGetUniformLocation(m_ShaderID, name.c_str()));
-        ASSERT(loc != -1);
+        //ASSERT(loc != -1);
         
         return loc;
     }

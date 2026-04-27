@@ -148,7 +148,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="res\shader\FSShader.frag" />
+    <None Include="res\shader\PhongLightShader.frag" />
     <None Include="res\shader\FSShaderLight.frag" />
     <None Include="res\shader\VSShader.vert" />
     <None Include="res\shader\VSShaderLight.vert" />

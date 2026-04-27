@@ -13,7 +13,6 @@ namespace Engine
         void CreateShaderInternal(const std::string& vsFile, const std::string& fsFile);
         unsigned int CompileShaderInternal(const char* source, unsigned int type);
     public:
-        Shader();
         Shader(const std::string& vsFile = std::string{""}, const std::string& fsFile = std::string{""});
         ~Shader();
     
