@@ -15,10 +15,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\Application.cpp">
+    <ClCompile Include="..\Dependences\glad\src\glad.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\Dependences\glad\src\glad.c">
+    <ClCompile Include="src\Load_Mode_Test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

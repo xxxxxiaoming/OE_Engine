@@ -1,12 +1,13 @@
 ﻿#pragma once
 #include <glad/glad.h>
 #include <vector>
+#include <assimp/material.h>
 
 #include "VertexAttribArray.h"
 #include "VertexArrayBuffer.h"
 #include "VertexBuffer.h"
 #include "IndexBuffer.h"
-#include "Shader.h"
+
 #include "Texture.h"
 #include "Material.h"
 #include "Type.h"
@@ -20,28 +21,29 @@ namespace Engine
 		VertexBuffer m_VBO;
 		IndexBuffer m_IBO;
 
-		int m_VertexCount;
-		int m_IndexCount;
+		uint32_t m_VertexCount;
+		uint32_t m_IndexCount;
 
 		bool m_Cleared = false;
 	public:
-		Material* m_Material = nullptr;
+		std::string m_AssetDirectory;
 		
-		Object(const Vertex* vertices, const int* indices, int vertexCount, int indexCount);
+		Material m_Material;
+		std::vector<Texture> m_TexturesDiffuse;
+		std::vector<Texture> m_TextureSpecular;
+		
+		Object(const Vertex* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t indexCount, std::string& assetDirectory);
 		~Object();
 
-		void OnDraw() const;
+		void OnDraw();
 		 
 		void Destroy();
 
 		inline const VertexArrayBuffer& GetVAO() const { return m_VAO; }
 		inline const VertexBuffer& GetVBO() const { return m_VBO; }
 		inline const IndexBuffer& GetIBO() const { return m_IBO; }
-		inline int GetIndexCount() const { return m_IndexCount; }
-		inline int GetVertexCount() const { return m_VertexCount; }
-		
-		inline void BindMaterial(Material* material) { m_Material = material; }
-		inline void UnBindMaterial() { m_Material = nullptr; }
+		inline uint32_t GetIndexCount() const { return m_IndexCount; }
+		inline uint32_t GetVertexCount() const { return m_VertexCount; }
 	};
 }
 

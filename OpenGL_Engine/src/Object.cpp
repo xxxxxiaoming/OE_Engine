@@ -1,7 +1,9 @@
-﻿#include "Object.h"
+﻿#include <string>
+#include <assimp/types.h>
+#include "Object.h"
 
-Engine::Object::Object(const Vertex* vertices, const int* indices, int vertexCount, int indexCount) :  
-	m_VertexCount(vertexCount), m_IndexCount(indexCount)
+Engine::Object::Object(const Vertex* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t indexCount, std::string& assetDirectory) :  
+	m_VertexCount(vertexCount), m_IndexCount(indexCount), m_AssetDirectory(assetDirectory)
 {
 	m_VAO.Bind();
 	
@@ -9,7 +11,7 @@ Engine::Object::Object(const Vertex* vertices, const int* indices, int vertexCou
 	m_VBO.SetBufferData(sizeof(Vertex) * vertexCount, vertices, GL_STATIC_DRAW);
 	
 	m_IBO.Bind();
-	m_IBO.SetBufferData(sizeof(int) * indexCount, indices, GL_STATIC_DRAW);
+	m_IBO.SetBufferData(sizeof(uint32_t) * indexCount, indices, GL_STATIC_DRAW);
 
 	VertexAttribArray::Enable(0);
 	VertexAttribArray::Enable(1);
@@ -32,14 +34,25 @@ Engine::Object::~Object()
 		Destroy();
 }
 
-void Engine::Object::OnDraw() const
+void Engine::Object::OnDraw()
 {
 	m_VAO.Bind();
+	
+	/* Maybe different object will have different shader in the future. So I decide to call UseMaterial here. */
+	m_Material.UseMaterial();
 
-	if(m_Material != nullptr)
-	{
-		m_Material->UseMaterial();
-	}
+	/* 目前先约定shader中，material结构体都是按照由下面的数据构成的。 */
+	/* 目前先固定使用1张diffuse跟1张specular，之后再扩展了 */
+	m_Material.shader->SetUniform1i("u_Material.diffuse", m_Material.diffuse[0]);
+	m_Material.shader->SetUniform1i("u_Material.specular", m_Material.specular[0]);
+	m_Material.shader->SetUniform1i("u_Material.shininess", m_Material.shininess);
+
+	/* Model.cpp load texture 的时候，已经限制了load texture的数量为MAX_TEXTURES，跟一个Material对象能够使用的纹理数量一致 */
+	for (int index = 0; index < m_TexturesDiffuse.size(); index++)
+		m_TexturesDiffuse[index].Bind(m_Material.diffuse[index]);
+
+	for (int index = 0; index < m_TextureSpecular.size(); index++)
+		m_TextureSpecular[index].Bind(m_Material.specular[index]);
 }
 
 void Engine::Object::Destroy()
@@ -50,6 +63,12 @@ void Engine::Object::Destroy()
 	m_VAO.Delete();
 	m_VBO.DeleteBuffer();
 	m_IBO.DeleteBuffer();
+
+	for (auto& texture : m_TexturesDiffuse)
+		texture.Delete();
+
+	for (auto& texture : m_TextureSpecular)
+		texture.Delete();
 
 	m_Cleared = true;
 }

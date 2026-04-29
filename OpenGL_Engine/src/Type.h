@@ -17,6 +17,10 @@ namespace Engine
 		LookLeft,
 		LookRight,
 	};
+	enum class TextureType
+	{
+		DIFFUSE, SPECULAR, NORMAL, NONE
+	};
     struct vec2
     {
         float x, y;

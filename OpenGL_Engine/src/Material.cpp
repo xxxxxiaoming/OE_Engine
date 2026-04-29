@@ -1,55 +1,42 @@
 ﻿#include "Material.h"
 
-Engine::Material::Material(const std::string& vsPath, const std::string& fsPath, const std::string* textures, const int* textureSlots, int textureNum)
-    : m_Shader{ vsPath, fsPath }
+void Engine::Material::UseMaterial() const
 {
-	textureNum > MAX_TEXTURES ? textureNum = MAX_TEXTURES : textureNum;
-    m_Texture.reserve(textureNum);
-    for (int index = 0; index < textureNum; index++)
-    {
-        m_Texture.emplace_back(textures[index]);
-		m_Texture.back().m_Slot = textureSlots[index];
-    }
+    if (shader != nullptr && shader->CheckShaderValidity())
+        shader->Use();
 }
 
-Engine::Material::~Material()
+void Engine::Material::UnuseMaterial() const
 {
-    if(!m_Cleared)
-	    Delete();
+    if (shader != nullptr && shader->CheckShaderValidity())
+        shader->UnUse();
 }
 
-void Engine::Material::UseMaterial()
+void Engine::Material::BindDiffuseSlots(int* slots, int slotsNum)
 {
-	m_Shader.Use();
-    if (m_Texture.size() > 0)
-    {
-        for(auto& texture : m_Texture)
-        {
-            texture.Bind(texture.GetTextureSlot());
-		}
-    }
+    slotsNum = slotsNum > MAX_TEXTURES ? MAX_TEXTURES : slotsNum;
+    for (int index = 0; index < slotsNum; index++)
+        diffuse[index] = slots[index];
 }
 
-void Engine::Material::UnuseMaterial()
+void Engine::Material::BindSpecularSlots(int* slots, int slotsNum)
 {
-    m_Shader.UnUse();
+    slotsNum = slotsNum > MAX_TEXTURES ? MAX_TEXTURES : slotsNum;
+    for (int index = 0; index < slotsNum; index++)
+        specular[index] = slots[index];
 }
 
-void Engine::Material::Delete()
+int Engine::Material::GetTextureDiffuseSlot(int index)
 {
-    if (m_Cleared)
-        return;
+    assert(index >= 0 && index < MAX_TEXTURES);
 
-    if (m_Shader.CheckShaderValidity())
-    {
-        m_Shader.Delete();
-    }
-    
-    for (auto& texture : m_Texture)
-    {
-        if(texture.CheckTextureValidity())
-            texture.Delete();
-    }
-
-    m_Cleared = true;
+    return diffuse[index];
 }
+
+int Engine::Material::GetTextureSpecularSlot(int index)
+{
+    assert(index >= 0 && index < MAX_TEXTURES);
+
+    return specular[index];
+}
+

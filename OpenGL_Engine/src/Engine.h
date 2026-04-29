@@ -11,4 +11,5 @@
 #include "Camera.h"
 #include "CameraController.h"
 #include "Object.h"
+#include "Model.h"
 #include "Type.h"

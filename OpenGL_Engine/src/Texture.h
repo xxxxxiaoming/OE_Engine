@@ -1,5 +1,7 @@
 ﻿#pragma once
 #include <string>
+#include <unordered_map>
+#include "Type.h"
 
 namespace Engine
 {
@@ -12,6 +14,10 @@ namespace Engine
         int m_Width;
         int m_Height;
         int m_BPP;
+
+        inline static std::unordered_map<std::string, const Texture*> CACHE_MAP;
+        inline static std::unordered_map<std::string, uint32_t> REF_MAP;
+
     public:
         int m_Slot = 0;
 

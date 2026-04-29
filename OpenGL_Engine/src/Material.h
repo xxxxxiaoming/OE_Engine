@@ -4,26 +4,27 @@
 #include "Shader.h"
 #include "Texture.h"
 
-#define MAX_TEXTURES 16
-
 namespace Engine
 {
+	#define MAX_TEXTURES (4) /* Support maximum 4 textures of each type in one material (just my decision.) */
+	
 	struct Material
 	{
-		Shader m_Shader;
-		std::vector<Texture> m_Texture;
+		Shader* shader = nullptr;
+		int diffuse[MAX_TEXTURES]{}; // texture slot(diffuse) aka 这个材质对象使用的diffuse纹理插槽
+		int specular[MAX_TEXTURES]{};// texture slot(diffuse) aka 这个材质对象使用的specular纹理插槽
+		uint32_t shininess = 8;
 		
-		Material(const std::string& vsPath, const std::string& fsPath, const std::string* textures, const int* textureSlots, const int textureNum);
-		~Material();
+		void UseMaterial()  const;
+		void UnuseMaterial() const;
+		void BindDiffuseSlots(int* slots, int slotsNum);
+		void BindSpecularSlots(int* slots, int slotsNum);
 
-		void Delete();
+		inline void BindShader(Shader* sd) { shader = sd; }
+		inline Shader* GetShader() { return shader; }
+		int GetTextureDiffuseSlot(int index);
+		int GetTextureSpecularSlot(int index);
 
-		void UseMaterial();
-		void UnuseMaterial();
-
-		inline Shader& GetShader() { return m_Shader; }
-		
-	private:
-		bool m_Cleared = false;
+		inline void SetShininess(uint32_t shin) { shininess = shin; }
 	};
 }

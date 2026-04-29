@@ -12,10 +12,34 @@ Engine::Texture::Texture() :
 
 Engine::Texture::Texture(const std::string& fileName) : m_FileName(fileName)
 {
+    if (CACHE_MAP.find(fileName) != CACHE_MAP.end() && CACHE_MAP[fileName] != nullptr)
+    {
+        // TODO: Multi thread safety & need improve
+        const Texture* texture = CACHE_MAP[fileName];
+        
+        m_GLTextureID = texture->m_GLTextureID;
+        m_Width = texture->m_Width;
+        m_Height = texture->m_Height;
+        m_BPP = texture->m_BPP;
+        
+        REF_MAP[fileName]++;
+        
+        return;
+    }
+    
     /* 垂直翻转图片，使图片的坐标原点在左下角 */
     stbi_set_flip_vertically_on_load(1);
     /* load texture image */
-    unsigned char* textLocalBuffer = stbi_load(fileName.c_str(), &m_Width, &m_Height,&m_BPP, 4);
+    unsigned char* textLocalBuffer = stbi_load(fileName.c_str(), &m_Width, &m_Height,&m_BPP, 0);
+
+    int format = GL_RGBA8;
+
+    if (m_BPP == 1)
+        format = GL_RED;
+    else if (m_BPP == 3)
+        format = GL_RGB;
+    else if (m_BPP = 4)
+        format = GL_RGBA8;
     
     /* Create texture buffer and bind buffer to operate */
     GLCALL(glGenTextures(1, &m_GLTextureID));
@@ -28,8 +52,12 @@ Engine::Texture::Texture(const std::string& fileName) : m_FileName(fileName)
     GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));/* 设置纹理的竖向填充方式（纹理的竖向比例与viewport比例不适配），GL_CLAMP_TO_EDGE 平铺 */
     
     /* Send texture data to texture buffer */
-    GLCALL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_Width, m_Height, 0, GL_RGBA, GL_UNSIGNED_BYTE, textLocalBuffer));
+    GLCALL(glTexImage2D(GL_TEXTURE_2D, 0, format, m_Width, m_Height, 0, format, GL_UNSIGNED_BYTE, textLocalBuffer));
     GLCALL(glGenerateMipmap(GL_TEXTURE_2D));
+
+    // TODO: Multi thread safety
+    CACHE_MAP[fileName] = this;
+    REF_MAP[fileName] = 1;
     
     if (textLocalBuffer != nullptr)
         stbi_image_free(textLocalBuffer);
@@ -37,18 +65,22 @@ Engine::Texture::Texture(const std::string& fileName) : m_FileName(fileName)
 
 Engine::Texture::~Texture()
 {
-    if (m_GLTextureID != 0)
-    {
-        GLCALL(glDeleteTextures(1, &m_GLTextureID));
-    }
+    Delete();
 }
 
 void Engine::Texture::Delete()
 {
     if (m_GLTextureID != 0)
     {
-        GLCALL(glDeleteTextures(1, &m_GLTextureID));
-        m_GLTextureID = 0;
+        REF_MAP[m_FileName]--;
+        if (REF_MAP[m_FileName] <= 0)
+        {
+            GLCALL(glDeleteTextures(1, &m_GLTextureID));
+            
+            // TODO: Multi thread safety.
+            CACHE_MAP[m_FileName] = nullptr;
+            m_GLTextureID = 0;
+        }
     }
 }
 
