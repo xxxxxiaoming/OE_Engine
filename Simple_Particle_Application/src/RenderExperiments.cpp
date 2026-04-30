@@ -1,17 +1,11 @@
-﻿#include <string>
+﻿#include "RenderExperments.h"
+
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "Engine.h"
-
-int main()
+void LoadModelExperiment(const std::string& path, Engine::Renderer& renderer)
 {
-	Engine::Renderer renderer{ 1280, 720, "Hello OpenGL!" };
-
-	renderer.EnableBlend();
-	renderer.EnableDepthTest();
-
 	/* Camera and controller */
 	glm::vec3 camPostion = glm::vec3(0.0f, 0.0f, 0.0f);
 	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
@@ -33,7 +27,7 @@ int main()
 	camController.PossessCamera(&cam);
 
 	/* Load Mode*/
-	std::string modelPath{ "res/assets/backpack/backpack.obj" };
+	std::string modelPath{ path };
 	Engine::Model model{ modelPath };
 
 	std::string vsShaderFile = "res/shader/VSShader.vert";
@@ -48,7 +42,7 @@ int main()
 
 	float modelRotateSpeed = 0.0f;
 	glm::vec3 lightPosition(0.0f, 0.0f, 0.0f);
-	glm::mat4 modelMatLight = glm::translate(glm::mat4(1.0f), glm::vec3(17, 17, 0));
+	glm::mat4 modelMatLight = glm::translate(glm::mat4(1.0f), glm::vec3(7, 0, 0));
 	glm::mat4 modelMat = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -10));
 	glm::mat4 viewMat = cam.GetViewMatrix();
 	glm::mat4 projectionMat = glm::perspective(glm::radians(45.0f), 640.0f / 360.0f, 0.1f, 3000.0f);
@@ -60,7 +54,7 @@ int main()
 	/* 光照配置 */
 	shader.SetUniform1i("u_LightConfig.enableDirectionLight", 1);	// 开启方向光源
 	shader.SetUniform1i("u_LightConfig.pointLightNum", 1);			// 使用1个点光源
-	shader.SetUniform1i("u_LightConfig.spotLightNum", 1);			// 使用一个聚光源
+	shader.SetUniform1i("u_LightConfig.spotLightNum", 0);			// 使用一个聚光源
 
 	/* 方向光配置 */
 	shader.SetUniform3f("u_DirectionLight.direction", 1.0f, 1.0f, 1.0f);
@@ -123,9 +117,4 @@ int main()
 		model.Draw(renderer);
 		renderer.Render();
 	}
-
-	model.Destroy();
-	shader.Delete();
-	renderer.Clear();
-	return 0;
 }

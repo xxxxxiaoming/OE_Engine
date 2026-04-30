@@ -140,6 +140,7 @@ Engine::Part::~Part()
 Engine::Model::Model(const std::string& path) :
 	m_ModelPath(path)
 {
+	printf("Loading ...\n");
 	Assimp::Importer importer;
 	const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs);
 	
@@ -150,7 +151,7 @@ Engine::Model::Model(const std::string& path) :
 	std::string assetDirectory = path.substr(0, path.find_last_of('/') + 1);
 	ProcessNode(scene->mRootNode, scene, assetDirectory);
 
-	printf("Completed");
+	printf("Loading completed\n");
 }
 
 void Engine::Model::ProcessNode(const aiNode* node, const aiScene* scene, std::string& assetDirectory)

@@ -7,7 +7,6 @@
 Engine::Texture::Texture() :
 	m_FileName(std::string{ "" }), m_GLTextureID(0), m_Width(0), m_Height(0), m_BPP(0)
 {
-    printf("Default Constructor.");
 }
 
 Engine::Texture::Texture(const std::string& fileName) : m_FileName(fileName)
@@ -63,9 +62,55 @@ Engine::Texture::Texture(const std::string& fileName) : m_FileName(fileName)
         stbi_image_free(textLocalBuffer);
 }
 
+Engine::Texture::Texture(const Texture& texture) noexcept:
+    m_FileName(texture.m_FileName), m_GLTextureID(texture.m_GLTextureID), m_Width(texture.m_Width), m_Height(texture.m_Height), m_BPP(texture.m_BPP), m_Slot(texture.m_Slot)
+{ }
+
+Engine::Texture::Texture(Texture&& texture) noexcept:
+    m_FileName(texture.m_FileName), m_GLTextureID(texture.m_GLTextureID), m_Width(texture.m_Width), m_Height(texture.m_Height), m_BPP(texture.m_BPP), m_Slot(texture.m_Slot)
+{
+    texture.m_FileName = "";
+    texture.m_GLTextureID = 0;
+    texture.m_Width = 0;
+    texture.m_Height = 0;
+    texture.m_BPP = 0;
+    texture.m_Slot = 0;
+}
+
 Engine::Texture::~Texture()
 {
     Delete();
+}
+
+Engine::Texture& Engine::Texture::operator=(const Texture& texture) noexcept
+{
+    m_FileName = texture.m_FileName;
+    m_GLTextureID = texture.m_GLTextureID;
+    m_Width = texture.m_Width;
+    m_Height = texture.m_Height;
+    m_BPP = texture.m_BPP;
+    m_Slot = texture.m_Slot;
+
+    return *this;
+}
+
+Engine::Texture& Engine::Texture::operator=(Texture&& texture) noexcept
+{
+    m_FileName = texture.m_FileName;
+    m_GLTextureID = texture.m_GLTextureID;
+    m_Width = texture.m_Width;
+    m_Height = texture.m_Height;
+    m_BPP = texture.m_BPP;
+    m_Slot = texture.m_Slot;
+
+    texture.m_FileName = "";
+    texture.m_GLTextureID = 0;
+    texture.m_Width = 0;
+    texture.m_Height = 0;
+    texture.m_BPP = 0;
+    texture.m_Slot = 0;
+
+    return *this;
 }
 
 void Engine::Texture::Delete()

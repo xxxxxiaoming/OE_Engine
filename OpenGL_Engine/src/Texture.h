@@ -22,8 +22,13 @@ namespace Engine
         int m_Slot = 0;
 
         Texture();
+        Texture(const Texture& texture) noexcept;
+        Texture(Texture&& texture) noexcept;
         Texture(const std::string& fileName);
         ~Texture();
+
+        Texture& operator=(const Texture& texture) noexcept;
+        Texture& operator=(Texture&& texture) noexcept;
 
         static void PrintTextureLimitInfo();
     
