@@ -12,6 +12,10 @@ Engine::Renderer::Renderer(int width, int height, const char* title)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // Open core profile.
+
+#ifdef __APPLE__
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#endif
     
     m_Window = glfwCreateWindow(width, height, title, nullptr, nullptr);
     
@@ -90,7 +94,7 @@ void Engine::Renderer::DrawElements(int count, const unsigned int* indices) cons
 
 void Engine::Renderer::OnRender() const
 {
-    GLCALL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+    GLCALL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT));
 }
 
 void Engine::Renderer::Render() const
@@ -118,6 +122,26 @@ void Engine::Renderer::EnableDepthTest() const
 void Engine::Renderer::DisableDepthTest() const
 {
     GLCALL(glDisable(GL_DEPTH_TEST));
+}
+
+void Engine::Renderer::EnebleStencilTest() const
+{
+    GLCALL(glEnable(GL_STENCIL_TEST));
+}
+
+void Engine::Renderer::DisableStencilTest() const
+{
+    GLCALL(glDisable(GL_STENCIL_TEST));
+}
+
+void Engine::Renderer::SetStencilFunc(uint32_t func, int ref, uint32_t mask) const
+{
+    GLCALL(glStencilFunc(func, ref, mask));
+}
+
+void Engine::Renderer::SetStencilOp(uint32_t sfail, uint32_t dfail, uint32_t dpass) const
+{
+    GLCALL(glStencilOp(sfail, dfail, dpass));
 }
 
 // void Engine::Renderer::AddDataBuffer(const unsigned int bufferID)

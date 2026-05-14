@@ -25,6 +25,7 @@ namespace Engine
 		uint32_t m_IndexCount;
 
 		bool m_Cleared = false;
+		bool m_EnableLight = true;
 	public:
 		std::string m_AssetDirectory;
 		
@@ -38,6 +39,9 @@ namespace Engine
 		void OnDraw();
 		 
 		void Destroy();
+
+		inline void EnableLight() { m_EnableLight = true; }
+		inline void DisableLight() { m_EnableLight = false; }
 
 		inline const VertexArrayBuffer& GetVAO() const { return m_VAO; }
 		inline const VertexBuffer& GetVBO() const { return m_VBO; }

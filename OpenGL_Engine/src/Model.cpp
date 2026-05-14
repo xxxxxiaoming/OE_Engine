@@ -97,7 +97,7 @@ void Engine::Part::ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& 
 		{
 			/* 没有高光贴图的mesh绑定一张纯黑的默认贴图 */
 			object.m_TextureSpecular.reserve(1);
-			object.m_TextureSpecular.emplace_back("res/texture/default_specular/jpg");
+			object.m_TextureSpecular.emplace_back("res/texture/default_specular.jpg");
 		}
 		else
 		{

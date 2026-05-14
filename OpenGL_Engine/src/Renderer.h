@@ -31,11 +31,16 @@ namespace  Engine
         
         void EnableDepthTest() const;
         void DisableDepthTest() const;
+
+        void EnebleStencilTest() const;
+        void DisableStencilTest() const;
+        void SetStencilFunc(uint32_t func, int ref, uint32_t mask) const;
+        void SetStencilOp(uint32_t sfail, uint32_t dfail, uint32_t dpass) const;
         
         void DrawElements(int count, const unsigned int* indices) const;
         void OnRender() const;
         void Render() const;
-        void Clear() const {glfwTerminate();}
+        inline void Clear() const {glfwTerminate();}
         
         /* 加入到 dataBufferArray 的 data buffer 在运行结束时无需手动 delete buffer */
         // void AddDataBuffer(const unsigned int bufferID);

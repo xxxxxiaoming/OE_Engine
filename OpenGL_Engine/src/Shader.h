@@ -10,12 +10,14 @@ namespace Engine
     private:
         std::unordered_map<std::string, int> m_UniformLocations;
         unsigned int m_ShaderID = 0;
+        void CreateShaderFromSourceInternal(const char* vsSource, const char* fsSource);
         void CreateShaderInternal(const std::string& vsFile, const std::string& fsFile);
         unsigned int CompileShaderInternal(const char* source, unsigned int type);
     public:
+        Shader(const char* vsSource, const char* faSource);
         Shader(const std::string& vsFile = std::string{""}, const std::string& fsFile = std::string{""});
         ~Shader();
-    
+        
         void CreateShader(const std::string& vsFile = std::string{""}, const std::string& fsFile = std::string{""});
         
         void Use() const;

@@ -11,8 +11,8 @@ int main()
 	renderer.EnableBlend();
 	renderer.EnableDepthTest();
 
-	LoadModelExperiment(std::string{ "res/assets/backpack/backpack.obj" }, renderer);
-
+	//StencilTestExperiment(std::string{ "res/assets/backpack/backpack.obj" }, renderer);
+	RenderTargetExperiment(renderer);
 	renderer.Clear();
 	return 0;
 }

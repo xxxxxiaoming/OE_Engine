@@ -2,4 +2,5 @@
 #include <string>
 #include "Engine.h"
 
-void LoadModelExperiment(const std::string& path, Engine::Renderer& renderer);
+void StencilTestExperiment(const std::string& path, Engine::Renderer& renderer);
+void RenderTargetExperiment(Engine::Renderer& renderer);
