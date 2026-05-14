@@ -4,14 +4,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-void LoadModelExperiment(const std::string& path, Engine::Renderer& renderer)
+static void BindKeys(Engine::CameraController& camController)
 {
-	/* Camera and controller */
-	glm::vec3 camPostion = glm::vec3(0.0f, 0.0f, 0.0f);
-	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
-	Engine::CameraController camController{ renderer.GetGLFWwinow(), 20.0f, 10.0f };
-
-	/* Bind keys */
 	camController.BindKey(Engine::Operations::MoveUp, GLFW_KEY_Q);
 	camController.BindKey(Engine::Operations::MoveDown, GLFW_KEY_E);
 	camController.BindKey(Engine::Operations::MoveLeft, GLFW_KEY_A);
@@ -22,18 +16,60 @@ void LoadModelExperiment(const std::string& path, Engine::Renderer& renderer)
 	camController.BindKey(Engine::Operations::LookDown, GLFW_KEY_DOWN);
 	camController.BindKey(Engine::Operations::LookLeft, GLFW_KEY_LEFT);
 	camController.BindKey(Engine::Operations::LookRight, GLFW_KEY_RIGHT);
+}
+
+static void ConfigPhongLight(Engine::PhongLight& phongLight, const Engine::vec3& pointLightWorldPosition, Engine::Camera& camera)
+{
+	/* 光照配置 */
+	phongLight.EnableDirectionLight();								// 开启方向光源
+	phongLight.ConfigDirectionLight(
+		Engine::vec3{1.0f, 1.0f, 1.0f},
+		Engine::vec3{0.5f,0.5f,0.5f},
+		Engine::vec3{1.0f,1.0f,1.0f},
+		Engine::vec3{0.7f,0.7f,0.7f}
+		);
+	
+	phongLight.AddPointLight(
+		pointLightWorldPosition, 
+		Engine::vec3{0.1f, 0.1f, 0.1f}, 
+		Engine::vec3{0.5f,0.5f,0.5f},
+		Engine::vec3{1.0f, 1.0f, 1.0f},
+		1.0f, 0.001f, 0.0001f
+		);															// 使用1个点光源
+	
+	glm::vec3 cameraWorldPosition = camera.GetPosition();
+	glm::vec3 cameraLookDirection = camera.GetFront();
+	phongLight.AddSpotLight(
+		Engine::vec3{cameraWorldPosition.x, cameraWorldPosition.y, cameraWorldPosition.z},
+		Engine::vec3{cameraLookDirection.x, cameraLookDirection.y, cameraLookDirection.z},
+		Engine::vec3{0.1f, 0.1f, 0.1f},
+		Engine::vec3{0.5f, 0.5f, 0.5f},
+		Engine::vec3{0.3f, 0.3f, 0.3f},
+		5.0f, 10.0f, 1.0f, 0.001f, 0.0001f
+		);															// 使用1个聚光源
+}
+
+void RenderTargetExperiment(Engine::Renderer& renderer)
+{
+	/* Camera and controller */
+	glm::vec3 camPostion = glm::vec3(0.0f, 0.0f, 0.0f);
+	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
+	Engine::CameraController camController{ renderer.GetGLFWwinow(), 20.0f, 10.0f };
+
+	/* Bind keys */
+	BindKeys(camController);
 
 	/* Possess camera */
 	camController.PossessCamera(&cam);
+	
+	/* Phong Light*/
+	Engine::PhongLight phongLight;
 
 	/* Load Mode*/
-	std::string modelPath{ path };
+	std::string modelPath{ std::string{ "res/assets/backpack/backpack.obj" } };
 	Engine::Model model{ modelPath };
 
-	std::string vsShaderFile = "res/shader/VSShader.vert";
-	std::string fsShaderFile = "res/shader/PhongLightShader.frag";
-	Engine::Shader shader{ vsShaderFile, fsShaderFile };
-	model.BindShader(&shader);
+	phongLight.AddModel(model);
 
 	int diffuseSlots[1] = { 0 };
 	int specularSlots[1] = { 1 };
@@ -44,44 +80,138 @@ void LoadModelExperiment(const std::string& path, Engine::Renderer& renderer)
 	glm::vec3 lightPosition(0.0f, 0.0f, 0.0f);
 	glm::mat4 modelMatLight = glm::translate(glm::mat4(1.0f), glm::vec3(7, 0, 0));
 	glm::mat4 modelMat = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -10));
-	glm::mat4 viewMat = cam.GetViewMatrix();
 	glm::mat4 projectionMat = glm::perspective(glm::radians(45.0f), 640.0f / 360.0f, 0.1f, 3000.0f);
 	glm::mat3 normalMat = glm::transpose(glm::inverse(glm::mat3(modelMat)));
 	glm::vec3 lightWorldPos = modelMatLight * glm::vec4(lightPosition, 1.0f);
+	
+	ConfigPhongLight(phongLight, Engine::vec3{lightWorldPos.x, lightWorldPos.y, lightWorldPos.z}, cam);
+	
+	Engine::RenderTarget renderTarget{1280, 720};
+	renderTarget.CreateColorAttachment();
+	renderTarget.CreateRenderBuffer();
+	assert(renderTarget.CheckFramebufferStatus());
+	
+	Engine::vec3 rectPos[1] = { Engine::vec3{-1.0f, -1.0f, 0.0f} };
+	Engine::Vertex vertices[4];
+	uint32_t indices[6];
+	
+	
+	float width[1] = { 2.0f };
+	float height[1] = { 2.0f };
+	std::string assetDirector{ "res/texture" };
+	
+	Engine::createRectangle(rectPos, width, height, vertices, indices);
+	Engine::Object rectObj{ vertices, indices, 4, 6, assetDirector };
+	
+	rectObj.DisableLight();
+	
+	std::string vsShaderPathRect = "res/shader/FBVSShader.vert";
+	std::string fsShaderPathRect = "res/shader/FSShader.frag";
+	Engine::Shader shaderRect{ vsShaderPathRect, fsShaderPathRect };
+	Engine::Material matForRect;
+	matForRect.BindShader(&shaderRect);
+	
+	double lastFrameTime = glfwGetTime();
+	while (!renderer.CheckWindowShouldClose())
+	{
+		double currentFrame = glfwGetTime();
+		double deltaTime = currentFrame - lastFrameTime;
+		lastFrameTime = currentFrame;
+		
+		camController.ProcessInput(static_cast<float>(deltaTime));
+		
+		modelMat = glm::rotate(modelMat, glm::radians(static_cast<float>(deltaTime) * modelRotateSpeed), glm::vec3{ 0, 1.0f, 0 });
+		glm::mat4 viewMat = cam.GetViewMatrix();
+		normalMat = glm::transpose(glm::inverse(glm::mat3(modelMat)));
 
-	shader.Use();
+		renderTarget.BindFramebuffer();
+		
+		// clear render buffer before drawing
+		renderer.OnRender();
 
+		glm::vec3 camPosRealTime = cam.GetPosition();
+		glm::vec3 camFrontRealTime = cam.GetFront();
+
+		phongLight.ConfigMVPMatrix(modelMat, viewMat, projectionMat);
+		phongLight.ConfigNormalMatrix(normalMat);
+		phongLight.ConfigCameraWorldPosition(camPosRealTime);
+		
+
+		/* 每帧更新聚光源的位置，模拟控制手电筒^-^ */
+		phongLight.ConfigSpotLightPosition(0, Engine::vec3{camPosRealTime.x, camPosRealTime.y, camPosRealTime.z});
+		phongLight.ConfigSpotLightDirection(0, Engine::vec3{camFrontRealTime.x, camFrontRealTime.y, camFrontRealTime.z});
+		
+		phongLight.TurnOn();
+		model.Draw(renderer);
+		phongLight.TurnOff();
+		
+		renderTarget.UnbindFramebuffer();
+		
+		// clear buffer before drawing
+		renderer.OnRender();
+		
+		uint32_t texture = renderTarget.GetTextureBuffer();
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, texture);
+		
+		matForRect.UseMaterial();
+		rectObj.OnDraw();
+		renderer.DrawElements(rectObj.GetIndexCount(), nullptr);
+		
+		renderer.Render();
+	}
+}
+
+void StencilTestExperiment(const std::string& path, Engine::Renderer& renderer)
+{
+	/* Camera and controller */
+	glm::vec3 camPostion = glm::vec3(0.0f, 0.0f, 0.0f);
+	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
+	Engine::CameraController camController{ renderer.GetGLFWwinow(), 5.0f, 10.0f };
+
+	/* Bind keys */
+	BindKeys(camController);
+	
+	/* Possess camera */
+	camController.PossessCamera(&cam);
+	
+	/* Phong Light*/
+	Engine::PhongLight phongLight;
+
+	/* Load Model*/
+	std::string modelPath{ path };
+	Engine::Model model{ modelPath };
+	
+	std::string vsShaderFile = "res/shader/VSShader.vert";
+	std::string fsShaderFrameFile = "res/shader/DepthVisualizationShader.frag";
+	Engine::Shader shaderFrame{ vsShaderFile, fsShaderFrameFile };
+
+	int diffuseSlots[1] = { 0 };
+	int specularSlots[1] = { 1 };
+	model.BindDiffuseSlot(diffuseSlots, 1);
+	model.BindSpecularSlot(specularSlots, 1);
+
+	glm::vec3 lightPosition(0.0f, 0.0f, 0.0f);
+	glm::mat4 modelMatLight = glm::translate(glm::mat4(1.0f), glm::vec3(7, 0, 0));
+	glm::mat4 modelMat = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -10));
+	glm::mat4 viewMat = cam.GetViewMatrix();
+	glm::mat4 projectionMat = glm::perspective(glm::radians(45.0f), 640.0f / 360.0f, 0.1f, 300.0f);
+	glm::mat3 normalMat = glm::transpose(glm::inverse(glm::mat3(modelMat)));
+	glm::vec3 lightWorldPos = modelMatLight * glm::vec4(lightPosition, 1.0f);
+
+	glm::mat4 modelMatFrame = glm::scale(modelMat, glm::vec3(1.2f, 1.2f, 1.2f));
+	
 	/* 光照配置 */
-	shader.SetUniform1i("u_LightConfig.enableDirectionLight", 1);	// 开启方向光源
-	shader.SetUniform1i("u_LightConfig.pointLightNum", 1);			// 使用1个点光源
-	shader.SetUniform1i("u_LightConfig.spotLightNum", 0);			// 使用一个聚光源
+	phongLight.EnableDirectionLight();								// 开启方向光源
+	phongLight.ConfigDirectionLight(
+		Engine::vec3{1.0f, 1.0f, 1.0f},
+		Engine::vec3{0.5f,0.5f,0.5f},
+		Engine::vec3{1.0f,1.0f,1.0f},
+		Engine::vec3{0.7f,0.7f,0.7f}
+		);
+	
 
-	/* 方向光配置 */
-	shader.SetUniform3f("u_DirectionLight.direction", 1.0f, 1.0f, 1.0f);
-	shader.SetUniform3f("u_DirectionLight.color.ambient", 0.5f, 0.5f, 0.5f);
-	shader.SetUniform3f("u_DirectionLight.color.diffuse", 1.0f, 1.0f, 1.0f);
-	shader.SetUniform3f("u_DirectionLight.color.specular", 0.7f, 0.7f, 0.7f);
-
-	/* 点光源配置 */
-	shader.SetUniform3f("u_PointLights[0].position", lightWorldPos.x, lightWorldPos.y, lightWorldPos.z);
-	shader.SetUniform1f("u_PointLights[0].constant", 1.0f);
-	shader.SetUniform1f("u_PointLights[0].linear", 0.001f);
-	shader.SetUniform1f("u_PointLights[0].quadratic", 0.0001f);
-	shader.SetUniform3f("u_PointLights[0].color.ambient", 0.1f, 0.1f, 0.1f);
-	shader.SetUniform3f("u_PointLights[0].color.diffuse", 0.5f, 0.5f, 0.5f);
-	shader.SetUniform3f("u_PointLights[0].color.specular", 1.0f, 1.0f, 1.0f);
-
-	/* 聚光源配置 */
-	shader.SetUniform1f("u_SpotLights[0].innerAngle", glm::radians(5.0f));
-	shader.SetUniform1f("u_SpotLights[0].outterAngle", glm::radians(10.0f));
-	shader.SetUniform1f("u_SpotLights[0].constant", 1.0f);
-	shader.SetUniform1f("u_SpotLights[0].linear", 0.001f);
-	shader.SetUniform1f("u_SpotLights[0].quadratic", 0.0001f);
-	shader.SetUniform3f("u_SpotLights[0].color.ambient", 0.1f, 0.1f, 0.1f);
-	shader.SetUniform3f("u_SpotLights[0].color.diffuse", 1.0f, 1.0f, 1.0f);
-	shader.SetUniform3f("u_SpotLights[0].color.specular", 1.0f, 1.0f, 1.0f);
-
-	shader.UnUse();
+	renderer.EnebleStencilTest();
 
 	double lastFrame = glfwGetTime();
 	while (!renderer.CheckWindowShouldClose())
@@ -93,28 +223,48 @@ void LoadModelExperiment(const std::string& path, Engine::Renderer& renderer)
 		camController.ProcessInput(static_cast<float>(deltaTime));
 
 		/* Transform matrix */
-		modelMat = glm::rotate(modelMat, glm::radians(static_cast<float>(deltaTime) * modelRotateSpeed), glm::vec3{ 0, 1.0f, 0 });
+		modelMat = glm::translate(glm::mat4(1.0), glm::vec3(0.0f, 0.0f, -10.0));
+		modelMat = glm::rotate(modelMat, glm::radians(static_cast<float>(deltaTime * 0.0f)), glm::vec3(0.0f, 1.0f, 0.0f));
+		modelMatFrame = glm::scale(modelMat, glm::vec3(1.07f, 1.07f, 1.07f));
+		
 		glm::mat4 viewMat = cam.GetViewMatrix();
 		normalMat = glm::transpose(glm::inverse(glm::mat3(modelMat)));
 
 		renderer.OnRender();
+		
 
 		glm::vec3 camPosRealTime = cam.GetPosition();
 		glm::vec3 camFrontRealTime = cam.GetFront();
-
-		shader.Use();
-
-		shader.SetUniformMatrix4f("u_Model", modelMat);
-		shader.SetUniformMatrix4f("u_View", viewMat);
-		shader.SetUniformMatrix4f("u_Projection", projectionMat);
-		shader.SetUniformMatrix3f("u_NormalMat", normalMat);
-		shader.SetUniform3f("u_CameraPosition", camPosRealTime.x, camPosRealTime.y, camPosRealTime.z);
+		
+		phongLight.ConfigMVPMatrix(modelMat, viewMat, projectionMat);
+		phongLight.ConfigNormalMatrix(normalMat);
+		phongLight.ConfigCameraWorldPosition(camPosRealTime);
 
 		/* 每帧更新聚光源的位置，模拟控制手电筒^-^ */
-		shader.SetUniform3f("u_SpotLights[0].position", camPosRealTime.x, camPosRealTime.y, camPosRealTime.z);
-		shader.SetUniform3f("u_SpotLights[0].direction", camFrontRealTime.x, camFrontRealTime.y, camFrontRealTime.z);
+		phongLight.ConfigSpotLightPosition(0, Engine::vec3{camPosRealTime.x, camPosRealTime.y, camPosRealTime.z});
+		phongLight.ConfigSpotLightDirection(0, Engine::vec3{camFrontRealTime.x, camFrontRealTime.y, camFrontRealTime.z});
 
+		renderer.SetStencilFunc(GL_ALWAYS, 1, 0xFF);
+		renderer.SetStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+		
+		phongLight.AddModel(model);
+		phongLight.TurnOn();
 		model.Draw(renderer);
+		phongLight.TurnOff();
+
+		model.BindShader(&shaderFrame);
+		
+		shaderFrame.Use();
+
+		shaderFrame.SetUniformMatrix4f("u_Model", modelMatFrame);
+		shaderFrame.SetUniformMatrix4f("u_View", viewMat);
+		shaderFrame.SetUniformMatrix4f("u_Projection", projectionMat);
+		shaderFrame.SetUniform3f("u_CameraPosition", camPosRealTime.x, camPosRealTime.y, camPosRealTime.z);
+
+		renderer.SetStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+		renderer.SetStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+		model.Draw(renderer);
+
 		renderer.Render();
 	}
 }

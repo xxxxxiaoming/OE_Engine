@@ -31,14 +31,24 @@ Engine::Texture::Texture(const std::string& fileName) : m_FileName(fileName)
     /* load texture image */
     unsigned char* textLocalBuffer = stbi_load(fileName.c_str(), &m_Width, &m_Height,&m_BPP, 0);
 
-    int format = GL_RGBA8;
+    int innerFormat = GL_RGBA8;
+    int format = GL_RGBA;
 
     if (m_BPP == 1)
+    {
+        innerFormat = GL_RED;
         format = GL_RED;
+    }
     else if (m_BPP == 3)
+    {
+        innerFormat = GL_RGB8;
         format = GL_RGB;
+    }
     else if (m_BPP = 4)
-        format = GL_RGBA8;
+    {
+        innerFormat = GL_RGBA8;
+        format = GL_RGBA;
+    }
     
     /* Create texture buffer and bind buffer to operate */
     GLCALL(glGenTextures(1, &m_GLTextureID));
@@ -51,7 +61,7 @@ Engine::Texture::Texture(const std::string& fileName) : m_FileName(fileName)
     GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));/* 设置纹理的竖向填充方式（纹理的竖向比例与viewport比例不适配），GL_CLAMP_TO_EDGE 平铺 */
     
     /* Send texture data to texture buffer */
-    GLCALL(glTexImage2D(GL_TEXTURE_2D, 0, format, m_Width, m_Height, 0, format, GL_UNSIGNED_BYTE, textLocalBuffer));
+    GLCALL(glTexImage2D(GL_TEXTURE_2D, 0, innerFormat, m_Width, m_Height, 0, format, GL_UNSIGNED_BYTE, textLocalBuffer));
     GLCALL(glGenerateMipmap(GL_TEXTURE_2D));
 
     // TODO: Multi thread safety

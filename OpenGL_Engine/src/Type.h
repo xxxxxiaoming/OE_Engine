@@ -46,7 +46,7 @@ namespace Engine
     };
 
     template <size_t SIZE = 1>
-	void createRectangle(const vec3* positions, const float* width, const float* height, Vertex* vertices, int* indices)
+	void createRectangle(const vec3* positions, const float* width, const float* height, Vertex* vertices, uint32_t* indices)
 	{
 		for (int count = 0; count < SIZE; count++)
 		{
@@ -96,7 +96,7 @@ namespace Engine
 	}
 	
 	template<size_t SIZE>
-	void CreateCube(const vec3* centers, const float* width, const float* height, const float* depth, Vertex* vertices, int* indices)
+	void CreateCube(const vec3* centers, const float* width, const float* height, const float* depth, Vertex* vertices, uint32_t* indices)
 	{
 		for (int count = 0; count < SIZE; count++)
 		{

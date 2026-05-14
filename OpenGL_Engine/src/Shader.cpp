@@ -6,6 +6,11 @@
 #include "Shader.h"
 #include "Helper.h"
 
+Engine::Shader::Shader(const char* vsSource, const char* faSource)
+{
+    CreateShaderFromSourceInternal(vsSource, faSource);
+}
+
 Engine::Shader::Shader(const std::string& vsFile, const std::string& fsFile)
 {
     CreateShaderInternal(vsFile, fsFile);
@@ -75,6 +80,72 @@ unsigned int Engine::Shader::CompileShaderInternal(const char* source, const uns
     }
     
     return shaderID;
+}
+
+void Engine::Shader::CreateShaderFromSourceInternal(const char* vsSource, const char* fsSource)
+{
+    if (m_ShaderID == 0)
+    {
+        GLCALL(m_ShaderID = glCreateProgram());
+    }
+    
+    uint32_t vsShaderID = 0;
+    uint32_t fsShaderID = 0;
+    
+    if (vsSource != nullptr)
+    {
+        vsShaderID = CompileShaderInternal(vsSource, GL_VERTEX_SHADER);
+        
+        if (vsShaderID != 0)
+        {
+            GLCALL(glAttachShader(m_ShaderID, vsShaderID));
+        }
+    }
+    
+    if (fsSource != nullptr)
+    {
+        fsShaderID = CompileShaderInternal(fsSource, GL_FRAGMENT_SHADER);
+        
+        if (fsShaderID != 0)
+        {
+            GLCALL(glAttachShader(m_ShaderID, fsShaderID));
+        }
+    }
+    
+    if (vsShaderID != 0 || fsShaderID != 0)
+    {
+        GLCALL(glLinkProgram(m_ShaderID));
+        
+        int linkStatus = 0;
+        GLCALL(glGetProgramiv(m_ShaderID, GL_LINK_STATUS, &linkStatus));
+        
+        if (linkStatus == GL_FALSE)
+        {
+            int length = 0;
+            GLCALL(glGetProgramiv(m_ShaderID, GL_INFO_LOG_LENGTH, &length));
+            
+            char* log = static_cast<char*>(alloca(sizeof(char) * length));
+            GLCALL(glGetProgramInfoLog(m_ShaderID, sizeof(char) * length, &length, log));
+            GLCALL(glDeleteProgram(m_ShaderID));
+            
+            m_ShaderID = 0;
+            printf("Shader linking failed. \n Error Info: \n%s", log);
+        }
+        else
+        {
+            if (vsShaderID != 0)
+            {
+                GLCALL(glDeleteShader(vsShaderID));
+            }
+            
+            if (fsShaderID != 0)
+            {
+                GLCALL(glDeleteShader(fsShaderID));
+            }
+            
+            GLCALL(glValidateProgram(m_ShaderID));
+        }
+    }
 }
 
 void Engine::Shader::CreateShaderInternal(const std::string& vsFile = std::string{""}, const std::string& fsFile = std::string{""})

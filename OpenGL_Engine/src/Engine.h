@@ -13,3 +13,5 @@
 #include "Object.h"
 #include "Model.h"
 #include "Type.h"
+#include "RenderTarget.h"
+#include "PhongLight.h"
