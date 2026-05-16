@@ -39,12 +39,13 @@ void Engine::Object::OnDraw()
 	m_VAO.Bind();
 	
 	/* Maybe different object will have different shader in the future. So I decide to call UseMaterial here. */
-	/* 开启phong light的情况下，在 PhongLight::TurnOn() 中use shader */
+	/* 开启 phong light的情况下，在 PhongLight::TurnOn() 中 use shader */
 	if (!m_EnableLight)
+	{
 		m_Material.UseMaterial();
-
-	if (!m_EnableLight)
 		return;
+	}
+	
 
 	/* 目前先约定shader中，material结构体都是按照由下面的数据构成的。 */
 	/* 目前先固定使用1张diffuse跟1张specular，之后再扩展了 */

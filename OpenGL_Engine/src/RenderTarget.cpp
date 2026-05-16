@@ -71,6 +71,8 @@ void Engine::RenderTarget::SaveColorAttachment() const
 	
 	std::string path = "res/screenshot/screenshot.png";
 	stbi_write_png(path.c_str(), m_Width, m_Height, 4, pixelBuffer, m_Width * 4);
+	
+	std::free(pixelBuffer);
 }
 
 void Engine::RenderTarget::DeleteFrameBuffer()
