@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include <glad/glad.h>
-// #include <GLFW/glfw3.h>
 #include "Renderer.h"
 #include "VertexArrayBuffer.h"
 #include "IndexBuffer.h"
@@ -15,3 +14,4 @@
 #include "Type.h"
 #include "RenderTarget.h"
 #include "PhongLight.h"
+#include "SkyBox.h"

@@ -37,7 +37,10 @@ namespace  Engine
         void ConfigNormalMatrix(const glm::mat3& normalMatrix);
         void ConfigCameraWorldPosition(const glm::vec3& position);
         
-        void AddModel(Model& model) { model.BindShader(&m_Shader);}
-        void AddObject(Object& object) { object.m_Material.shader = &m_Shader;}
+        void AddModel(Model& model) { model.BindShader(&m_Shader); model.EnableLight(); }
+        void AddObject(Object& object) { object.m_Material.shader = &m_Shader; object.EnableLight();}
+        
+        void RemoveModel(Model& model) {model.BindShader(nullptr); model.DisableLight();}
+        void RemoveObject(Object& object) {object.m_Material.shader = nullptr; object.DisableLight();}
     };
 }

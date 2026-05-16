@@ -49,5 +49,8 @@ namespace Engine
 		void BindDiffuseSlot(int* slots, int slotsNum);
 		void BindSpecularSlot(int* slots, int slotsNum);
 		void Draw(const Renderer& renderer);
+		
+		void EnableLight();
+		void DisableLight();
 	};
 }

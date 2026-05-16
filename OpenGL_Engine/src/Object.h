@@ -25,7 +25,7 @@ namespace Engine
 		uint32_t m_IndexCount;
 
 		bool m_Cleared = false;
-		bool m_EnableLight = true;
+		bool m_EnableLight = false;
 	public:
 		std::string m_AssetDirectory;
 		

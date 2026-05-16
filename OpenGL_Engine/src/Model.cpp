@@ -204,6 +204,20 @@ void Engine::Model::Draw(const Renderer& renderer)
 		}
 }
 
+void Engine::Model::EnableLight()
+{
+	for (auto& part : m_Parts)
+		for (auto& object : part.objects)
+			object.EnableLight();
+}
+
+void Engine::Model::DisableLight()
+{
+	for (auto& part : m_Parts)
+		for (auto& object : part.objects)
+			object.DisableLight();
+}
+
 Engine::Model::~Model()
 {
 	if (!m_Destroyed)

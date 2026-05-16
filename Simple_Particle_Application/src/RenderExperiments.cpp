@@ -37,16 +37,16 @@ static void ConfigPhongLight(Engine::PhongLight& phongLight, const Engine::vec3&
 		1.0f, 0.001f, 0.0001f
 		);															// 使用1个点光源
 	
-	glm::vec3 cameraWorldPosition = camera.GetPosition();
-	glm::vec3 cameraLookDirection = camera.GetFront();
-	phongLight.AddSpotLight(
-		Engine::vec3{cameraWorldPosition.x, cameraWorldPosition.y, cameraWorldPosition.z},
-		Engine::vec3{cameraLookDirection.x, cameraLookDirection.y, cameraLookDirection.z},
-		Engine::vec3{0.1f, 0.1f, 0.1f},
-		Engine::vec3{0.5f, 0.5f, 0.5f},
-		Engine::vec3{0.3f, 0.3f, 0.3f},
-		5.0f, 10.0f, 1.0f, 0.001f, 0.0001f
-		);															// 使用1个聚光源
+	// glm::vec3 cameraWorldPosition = camera.GetPosition();
+	// glm::vec3 cameraLookDirection = camera.GetFront();
+	// phongLight.AddSpotLight(
+	// 	Engine::vec3{cameraWorldPosition.x, cameraWorldPosition.y, cameraWorldPosition.z},
+	// 	Engine::vec3{cameraLookDirection.x, cameraLookDirection.y, cameraLookDirection.z},
+	// 	Engine::vec3{0.1f, 0.1f, 0.1f},
+	// 	Engine::vec3{0.5f, 0.5f, 0.5f},
+	// 	Engine::vec3{0.3f, 0.3f, 0.3f},
+	// 	5.0f, 10.0f, 1.0f, 0.001f, 0.0001f
+	// 	);															// 使用1个聚光源
 }
 
 void RenderTargetExperiment(Engine::Renderer& renderer)
@@ -64,12 +64,22 @@ void RenderTargetExperiment(Engine::Renderer& renderer)
 	
 	/* Phong Light*/
 	Engine::PhongLight phongLight;
+	
+	/* Sky Box */
+	Engine::SkyBox skyBox("res/texture/skybox/", ".jpg");
 
 	/* Load Mode*/
 	std::string modelPath{ std::string{ "res/assets/backpack/backpack.obj" } };
 	Engine::Model model{ modelPath };
-
-	phongLight.AddModel(model);
+	
+	// Sky Box Reflect
+	std::string skyBoxReflctVSFile = "res/shader/VSShader.vert";
+	std::string skyBoxReflctFSFile = "res/shader/SkyBoxReflectFShader.frag";
+	Engine::Shader skyBoxReflectShader{skyBoxReflctVSFile, skyBoxReflctFSFile};
+	model.BindShader(&skyBoxReflectShader);
+	model.DisableLight();
+	
+	// phongLight.AddModel(model);
 
 	int diffuseSlots[1] = { 0 };
 	int specularSlots[1] = { 1 };
@@ -106,7 +116,7 @@ void RenderTargetExperiment(Engine::Renderer& renderer)
 	rectObj.DisableLight();
 	
 	std::string vsShaderPathRect = "res/shader/FBVSShader.vert";
-	std::string fsShaderPathRect = "res/shader/FSShader.frag";
+	std::string fsShaderPathRect = "res/shader/FSPostProcessShader.frag";
 	Engine::Shader shaderRect{ vsShaderPathRect, fsShaderPathRect };
 	Engine::Material matForRect;
 	matForRect.BindShader(&shaderRect);
@@ -138,12 +148,26 @@ void RenderTargetExperiment(Engine::Renderer& renderer)
 		
 
 		/* 每帧更新聚光源的位置，模拟控制手电筒^-^ */
-		phongLight.ConfigSpotLightPosition(0, Engine::vec3{camPosRealTime.x, camPosRealTime.y, camPosRealTime.z});
-		phongLight.ConfigSpotLightDirection(0, Engine::vec3{camFrontRealTime.x, camFrontRealTime.y, camFrontRealTime.z});
+		// phongLight.ConfigSpotLightPosition(0, Engine::vec3{camPosRealTime.x, camPosRealTime.y, camPosRealTime.z});
+		// phongLight.ConfigSpotLightDirection(0, Engine::vec3{camFrontRealTime.x, camFrontRealTime.y, camFrontRealTime.z});
 		
-		phongLight.TurnOn();
+		// Draw Sky box
+		skyBox.SetVPMatrix(glm::mat4(glm::mat3(viewMat)), projectionMat);
+		skyBox.Draw();
+		
+		// phongLight.TurnOn();
+		GLCALL(glActiveTexture(GL_TEXTURE0));
+		GLCALL(glBindTexture(GL_TEXTURE_CUBE_MAP, skyBox.GetSkyBoxCubeMap()));
+		skyBoxReflectShader.Use();
+		skyBoxReflectShader.SetUniform1i("u_CubeMap", 0);
+		skyBoxReflectShader.SetUniformMatrix4f("u_Model", modelMat);
+		skyBoxReflectShader.SetUniformMatrix4f("u_View", viewMat);
+		skyBoxReflectShader.SetUniformMatrix4f("u_Projection", projectionMat);
+		skyBoxReflectShader.SetUniform3f("u_CameraPosition", camPosRealTime.x, camPosRealTime.y, camPosRealTime.z);
+		skyBoxReflectShader.SetUniform3f("u_LightPosition", lightWorldPos.x, lightWorldPos.y, lightWorldPos.z);
+		skyBoxReflectShader.SetUniformMatrix3f("u_NormalMat", normalMat);
 		model.Draw(renderer);
-		phongLight.TurnOff();
+		// phongLight.TurnOff();
 		
 		renderTarget.UnbindFramebuffer();
 		
