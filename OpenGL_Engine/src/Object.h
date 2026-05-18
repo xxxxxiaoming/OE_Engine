@@ -43,9 +43,9 @@ namespace Engine
 		inline void EnableLight() { m_EnableLight = true; }
 		inline void DisableLight() { m_EnableLight = false; }
 
-		inline const VertexArrayBuffer& GetVAO() const { return m_VAO; }
-		inline const VertexBuffer& GetVBO() const { return m_VBO; }
-		inline const IndexBuffer& GetIBO() const { return m_IBO; }
+		inline VertexArrayBuffer& GetVAO() { return m_VAO; }
+		inline VertexBuffer& GetVBO() { return m_VBO; }
+		inline IndexBuffer& GetIBO()  { return m_IBO; }
 		inline uint32_t GetIndexCount() const { return m_IndexCount; }
 		inline uint32_t GetVertexCount() const { return m_VertexCount; }
 	};

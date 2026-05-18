@@ -173,6 +173,20 @@ void Engine::Model::GetChildrenNum(aiNode* node, uint32_t& count)
 		GetChildrenNum(node->mChildren[index], count);
 }
 
+size_t Engine::Model::GetPartsCount() const
+{
+	return m_Parts.size();
+}
+
+size_t Engine::Model::GetObjectsCount() const
+{
+	size_t count = 0;
+	for (auto& part : m_Parts)
+		count += part.objects.size();
+	
+	return count;
+}
+
 void Engine::Model::BindShader(Shader* shader)
 {
 	for (auto& part : m_Parts)
@@ -201,6 +215,30 @@ void Engine::Model::Draw(const Renderer& renderer)
 		{
 			object.OnDraw();
 			renderer.DrawElements(object.GetIndexCount(), nullptr);
+		}
+}
+
+void Engine::Model::DrawInstanced(const Renderer& renderer, uint32_t amount)
+{
+	for (auto& part : m_Parts)
+		for (auto& object : part.objects)
+		{
+			object.OnDraw();
+			renderer.DrawElementsInstanced(object.GetIndexCount(), nullptr, amount);
+		}
+}
+
+void Engine::Model::BindInstancedVertexAttrib(int index, int size, int type, int stride, int offset, uint32_t divisor)
+{
+	for (auto& part : m_Parts)
+		for (auto& object : part.objects)
+		{
+			VertexArrayBuffer& VAO = object.GetVAO();
+			VAO.Bind();
+			VertexAttribArray::Enable(index);
+			VertexAttribArray::SetPointer(index, size, type, GL_FALSE, stride, offset);
+			VertexAttribArray::SetAttributeDivisor(index, divisor);
+			VAO.Unbind();
 		}
 }
 

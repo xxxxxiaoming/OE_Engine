@@ -8,8 +8,9 @@ int main()
 	renderer.EnableDepthTest();
 
 	//StencilTestExperiment(std::string{ "res/assets/backpack/backpack.obj" }, renderer);
-	RenderTargetExperiment(renderer);
+	// RenderTargetExperiment(renderer);
 	// DrawASimpleHouseUsingGS(renderer);
+	InstanceExperiment(renderer);
 	renderer.Clear();
 	return 0;
 }

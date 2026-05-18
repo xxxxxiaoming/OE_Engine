@@ -24,6 +24,11 @@ void Engine::VertexAttribArray::SetPointer(unsigned int index, int size, int typ
         GLCALL(glVertexAttribPointer(index, size, type, normalized, stride, (const void*)pointer));
 }
 
+void Engine::VertexAttribArray::SetAttributeDivisor(unsigned int index, unsigned int divisor)
+{
+    GLCALL(glVertexAttribDivisor(index, divisor));
+}
+
 void Engine::VertexAttribArray::Enable(unsigned int index)
 {
     GLCALL(glEnableVertexAttribArray(index));    

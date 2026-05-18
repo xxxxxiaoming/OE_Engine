@@ -8,6 +8,7 @@ namespace Engine
         VertexAttribArray() = delete;
         
         static void SetPointer(unsigned int index, int size, int type, int normalized, int stride, int pointer);
+        static void SetAttributeDivisor(unsigned int index, unsigned int divisor);
         
         static void Enable(unsigned int index);
         static void Disable(unsigned int index);

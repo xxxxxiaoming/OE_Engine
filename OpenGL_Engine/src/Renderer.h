@@ -38,6 +38,7 @@ namespace  Engine
         void SetStencilOp(uint32_t sfail, uint32_t dfail, uint32_t dpass) const;
         
         void DrawElements(int count, const unsigned int* indices, uint32_t mode = GL_TRIANGLES) const;
+        void DrawElementsInstanced(int count, const unsigned int* indices, uint32_t amount, uint32_t mode = GL_TRIANGLES) const;
         void OnRender() const;
         void Render() const;
         inline void Clear() const {glfwTerminate();}

@@ -49,6 +49,117 @@ static void ConfigPhongLight(Engine::PhongLight& phongLight, const Engine::vec3&
 	// 	);															// 使用1个聚光源
 }
 
+void GenerateRocksModelMatrices(int amount, float minOrbitRadius, float maxOrbitRadius, float zOffset, glm::mat4* matrices)
+{
+	for (int count = 0; count < amount; count++)
+	{
+		float rotateAngle = Engine::Random::Float(0.0f, 360.0f);
+		float radius = Engine::Random::Float(minOrbitRadius, maxOrbitRadius);
+		float scaleFactor = Engine::Random::Float(0.2, 0.3);
+		glm::mat4 modelMatrix{1.0f};
+		modelMatrix = glm::translate(modelMatrix, glm::vec3(0.0f, 0.0f, zOffset));
+		modelMatrix = glm::rotate(modelMatrix, rotateAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+		modelMatrix = glm::translate(modelMatrix, glm::vec3(radius, 0.0f, 0.0f));
+		modelMatrix = glm::scale(modelMatrix, glm::vec3(scaleFactor, scaleFactor, scaleFactor));
+		
+		matrices[count] = modelMatrix;
+	}
+}
+
+void InstanceExperiment(Engine::Renderer& renderer)
+{
+	/* Camera and controller */
+	glm::vec3 camPostion = glm::vec3(0.0f, 0.0f, 0.0f);
+	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
+	Engine::CameraController camController{ renderer.GetGLFWwinow(), 20.0f, 10.0f };
+
+	/* Bind keys */
+	BindKeys(camController);
+
+	/* Possess camera */
+	camController.PossessCamera(&cam);
+	
+	/* Load planet model */
+	Engine::Model planet{"res/assets/planet/planet.obj"};
+	Engine::Model rock{"res/assets/rock/rock.obj"};
+	
+	planet.DisableLight();
+	rock.DisableLight();
+	
+	Engine::Shader planetShader{std::string{"res/shader/BasicVS.vert"}, std::string{"res/shader/BasicFS.frag"}};
+	Engine::Shader rockShader{std::string{"res/shader/AsteroidVS.vert"}, std::string{"res/shader/BasicFS.frag"}};
+	
+	planet.BindShader(&planetShader);
+	rock.BindShader(&rockShader);
+	
+	int planetDiffuseSlot[1]  = {0};
+	int planetSpecularSlot[1]  = {1};
+	planet.BindDiffuseSlot(planetDiffuseSlot, 1);
+	planet.BindSpecularSlot(planetSpecularSlot, 1);
+	
+	int rockDiffuseSlot[1]  = {2};
+	int rockSpecularSlot[1]  = {3};
+	rock.BindDiffuseSlot(rockDiffuseSlot, 1);
+	rock.BindSpecularSlot(rockSpecularSlot, 1);
+	
+	float planetRotateSpeed = 7.0f;
+	float planetRotateAngle = 0.0f;
+	float zOffset = -10.0f;
+	
+	const int asteroidAmount = 7777;
+	glm::mat4 rocksModelMatrices[asteroidAmount];
+	GenerateRocksModelMatrices(asteroidAmount, 7.0f, 177.0f, zOffset, rocksModelMatrices);
+	
+	Engine::VertexBuffer rockModelMatricesVBO{};
+	rockModelMatricesVBO.Bind();
+	rockModelMatricesVBO.SetBufferData(sizeof(rocksModelMatrices), rocksModelMatrices, GL_STATIC_DRAW);
+	
+	rock.BindInstancedVertexAttrib(5, 4, GL_FLOAT, sizeof(glm::mat4), 0, 1);
+	rock.BindInstancedVertexAttrib(6, 4, GL_FLOAT, sizeof(glm::mat4), sizeof(glm::vec4), 1);
+	rock.BindInstancedVertexAttrib(7, 4, GL_FLOAT, sizeof(glm::mat4), 2 * sizeof(glm::vec4), 1);
+	rock.BindInstancedVertexAttrib(8, 4, GL_FLOAT, sizeof(glm::mat4), 3 * sizeof(glm::vec4), 1);
+	
+	glm::mat4 projectionMatrix = glm::perspective(glm::radians(45.0f), 640.0f / 360.0f, 0.1f, 3000.0f);
+	
+	double lastFrameTime = glfwGetTime();
+	while (!renderer.CheckWindowShouldClose())
+	{
+		double thisFrameTime = glfwGetTime();
+		float deltaTime = static_cast<float>(thisFrameTime - lastFrameTime);
+		lastFrameTime = thisFrameTime;
+		
+		planetRotateAngle += planetRotateSpeed * deltaTime;
+		
+		planetRotateAngle = planetRotateAngle >= 360.0f ? 0.0f : planetRotateAngle;
+		
+		camController.ProcessInput(deltaTime);
+		
+		glm::mat4 viewMatrix = cam.GetViewMatrix();
+		glm::mat4 planetModelMatrix = glm::mat4(1.0f);
+		
+		planetModelMatrix = glm::translate(planetModelMatrix, glm::vec3(0.0f, 0.0f, zOffset));
+		planetModelMatrix = glm::rotate(planetModelMatrix, glm::radians(planetRotateAngle), glm::vec3(0.0, 1.0f, 0.0f));
+		
+		
+		renderer.OnRender();
+		
+		planetShader.Use();
+		planetShader.SetUniformMatrix4f("u_Model", planetModelMatrix);
+		planetShader.SetUniformMatrix4f("u_View", viewMatrix);
+		planetShader.SetUniformMatrix4f("u_Projection", projectionMatrix);
+		planetShader.SetUniform1i("u_Diffuse", 0);
+		planet.Draw(renderer);
+		
+		rockShader.Use();
+		rockShader.SetUniformMatrix4f("u_View", viewMatrix);
+		rockShader.SetUniformMatrix4f("u_Projection", projectionMatrix);
+		rockShader.SetUniform1i("u_Diffuse", 2);
+		rock.DrawInstanced(renderer, asteroidAmount);
+		
+		renderer.Render();
+	}
+}
+
 void RenderTargetExperiment(Engine::Renderer& renderer)
 {
 	/* Camera and controller */
