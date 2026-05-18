@@ -38,6 +38,13 @@ void Engine::Object::OnDraw()
 {
 	m_VAO.Bind();
 	
+	/* Model.cpp load texture 的时候，已经限制了load texture的数量为MAX_TEXTURES，跟一个Material对象能够使用的纹理数量一致 */
+	for (int index = 0; index < m_TexturesDiffuse.size(); index++)
+		m_TexturesDiffuse[index].Bind(m_Material.diffuse[index]);
+
+	for (int index = 0; index < m_TextureSpecular.size(); index++)
+		m_TextureSpecular[index].Bind(m_Material.specular[index]);
+	
 	/* Maybe different object will have different shader in the future. So I decide to call UseMaterial here. */
 	/* 开启 phong light的情况下，在 PhongLight::TurnOn() 中 use shader */
 	if (!m_EnableLight)
@@ -46,19 +53,11 @@ void Engine::Object::OnDraw()
 		return;
 	}
 	
-
 	/* 目前先约定shader中，material结构体都是按照由下面的数据构成的。 */
 	/* 目前先固定使用1张diffuse跟1张specular，之后再扩展了 */
 	m_Material.shader->SetUniform1i("u_Material.diffuse", m_Material.diffuse[0]);
 	m_Material.shader->SetUniform1i("u_Material.specular", m_Material.specular[0]);
 	m_Material.shader->SetUniform1i("u_Material.shininess", m_Material.shininess);
-
-	/* Model.cpp load texture 的时候，已经限制了load texture的数量为MAX_TEXTURES，跟一个Material对象能够使用的纹理数量一致 */
-	for (int index = 0; index < m_TexturesDiffuse.size(); index++)
-		m_TexturesDiffuse[index].Bind(m_Material.diffuse[index]);
-
-	for (int index = 0; index < m_TextureSpecular.size(); index++)
-		m_TextureSpecular[index].Bind(m_Material.specular[index]);
 }
 
 void Engine::Object::Destroy()

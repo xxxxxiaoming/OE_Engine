@@ -40,6 +40,8 @@ namespace Engine
 		void GetChildrenNum(aiNode* node, uint32_t& count);
 
 	public:
+		uint32_t m_VBOIntanced = 0;
+		
 		Model(const std::string& path);
 		~Model();
 
@@ -49,8 +51,14 @@ namespace Engine
 		void BindDiffuseSlot(int* slots, int slotsNum);
 		void BindSpecularSlot(int* slots, int slotsNum);
 		void Draw(const Renderer& renderer);
+		void DrawInstanced(const Renderer& renderer, uint32_t amount);
+		
+		void BindInstancedVertexAttrib(int index, int size, int type, int stride, int offset, uint32_t divisor);
 		
 		void EnableLight();
 		void DisableLight();
+		
+		size_t GetPartsCount() const;
+		size_t GetObjectsCount() const;
 	};
 }

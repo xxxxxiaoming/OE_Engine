@@ -92,6 +92,11 @@ void Engine::Renderer::DrawElements(int count, const unsigned int* indices, uint
     GLCALL(glDrawElements(mode, count, GL_UNSIGNED_INT, indices));
 }
 
+void Engine::Renderer::DrawElementsInstanced(int count, const unsigned int* indices, uint32_t amount, uint32_t mode) const
+{
+    GLCALL(glDrawElementsInstanced(mode, count, GL_UNSIGNED_INT, indices, amount));
+}
+
 void Engine::Renderer::OnRender() const
 {
     GLCALL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT));
