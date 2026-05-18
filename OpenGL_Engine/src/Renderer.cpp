@@ -87,9 +87,9 @@ const GLFWwindow* Engine::Renderer::GetGLFWwinow() const
     return m_Window;
 }
 
-void Engine::Renderer::DrawElements(int count, const unsigned int* indices) const
+void Engine::Renderer::DrawElements(int count, const unsigned int* indices, uint32_t mode) const
 {
-    GLCALL(glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, indices));
+    GLCALL(glDrawElements(mode, count, GL_UNSIGNED_INT, indices));
 }
 
 void Engine::Renderer::OnRender() const

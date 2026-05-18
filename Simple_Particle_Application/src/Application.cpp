@@ -1,8 +1,4 @@
-﻿#include <string>
-#include <iostream>
-#include <vector>
-
-#include "RenderExperments.h"
+﻿#include "RenderExperments.h"
 
 int main()
 {
@@ -13,6 +9,7 @@ int main()
 
 	//StencilTestExperiment(std::string{ "res/assets/backpack/backpack.obj" }, renderer);
 	RenderTargetExperiment(renderer);
+	// DrawASimpleHouseUsingGS(renderer);
 	renderer.Clear();
 	return 0;
 }
