@@ -15,7 +15,6 @@ uniform mat4 u_Model;
 uniform mat4 u_View;
 uniform mat4 u_Projection;
 uniform vec3 u_CameraPosition;	// 相机世界坐标
-uniform vec3 u_LightPosition;   // 光源世界坐标
 uniform mat3 u_NormalMat;       // 法线变换矩阵(模型变换矩阵左上角3x3的逆矩阵的转置矩阵)
 
 out vec2 v_TexCoord;
@@ -143,7 +142,7 @@ vec3 calcPointLights(vec3 sampleColorDiffuse, vec3 sampleColorSpecular)
     float attenuation = 1.0; // 聚光源随着距离衰减的系数
     
     vec3 diffuseLight = vec3(0.0);
-    vec3 specularLigt = vec3(0.0);
+    vec3 specularLight = vec3(0.0);
     vec3 ambientLight = vec3(0.0);
     vec3 lookAtLight = vec3(0.0);
 
@@ -162,9 +161,10 @@ vec3 calcPointLights(vec3 sampleColorDiffuse, vec3 sampleColorSpecular)
         diffuseLight = diffuse * light.color.diffuse * sampleColorDiffuse;
 
         vec3 reflectVec = reflect(-normalize(lookAtLight), normal_Normalized);
-        specular = pow(max(dot(lookAtCamera_Normalized, reflectVec), 0.0), u_Material.shininess);
-        specularLigt = specular * light.color.specular * sampleColorSpecular * reflectDamping;
-        result += ((ambientLight + diffuseLight + specularLigt) * attenuation);
+        vec3 halfWayVec = normalize(lookAtCamera_Normalized + lookAtLight);
+        specular = pow(max(dot(normal_Normalized, halfWayVec), 0.0), u_Material.shininess);
+        specularLight = specular * light.color.specular * sampleColorSpecular * reflectDamping;
+        result += ((ambientLight + diffuseLight + specularLight) * attenuation);
     }
     return result;
 }
@@ -214,7 +214,11 @@ vec3 calcSpotLight(vec3 sampleColorDiffuse, vec3 sampleColorSpecular)
 void main() {
     vec3 sampleColorDiffuse = texture(u_Material.diffuse, v_TexCoord).rgb;
     vec3 sampleColorSpecular = texture(u_Material.specular, v_TexCoord).rgb;
+    //vec3 sampleColorSpecular = vec3(0.5, 0.5, 0.5);
     vec3 light = vec3(0.0, 0.0, 0.0);
+
+    // gamma correction
+    sampleColorDiffuse = pow(sampleColorDiffuse, vec3(2.2));
 
     normal_Normalized = normalize(v_Normal);
     lookAtCamera_Normalized = normalize(v_LookAtCamera);
@@ -222,6 +226,9 @@ void main() {
     light = calcDirectionLight(sampleColorDiffuse, sampleColorSpecular) + calcPointLights(sampleColorDiffuse, sampleColorSpecular) + calcSpotLight(sampleColorDiffuse, sampleColorSpecular);
 
     color = vec4(light, texture(u_Material.diffuse, v_TexCoord).a);
+
+    // gamma correction
+    color = vec4(pow(color.rgb, vec3(1.0/2.2)), color.a);
 
     /* 注意，这里是将纹理上，对应坐标的颜色RGB完完整整取出来，不会管Alpha通道的值的，就算Alpha是0，也会被完整取出来，写入到frame buffer中 */
     /* 所以要么在OpenGL开启Blend，要么在这里，自行过滤： */

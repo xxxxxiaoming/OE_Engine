@@ -55,7 +55,7 @@ void GenerateRocksModelMatrices(int amount, float minOrbitRadius, float maxOrbit
 	{
 		float rotateAngle = Engine::Random::Float(0.0f, 360.0f);
 		float radius = Engine::Random::Float(minOrbitRadius, maxOrbitRadius);
-		float scaleFactor = Engine::Random::Float(0.2, 0.3);
+		float scaleFactor = Engine::Random::Float(0.2f, 0.3f);
 		glm::mat4 modelMatrix{1.0f};
 		modelMatrix = glm::translate(modelMatrix, glm::vec3(0.0f, 0.0f, zOffset));
 		modelMatrix = glm::rotate(modelMatrix, rotateAngle, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -63,6 +63,88 @@ void GenerateRocksModelMatrices(int amount, float minOrbitRadius, float maxOrbit
 		modelMatrix = glm::scale(modelMatrix, glm::vec3(scaleFactor, scaleFactor, scaleFactor));
 		
 		matrices[count] = modelMatrix;
+	}
+}
+
+void AdvancedLighting(Engine::Renderer& renderer)
+{
+	/* Camera and controller */
+	glm::vec3 camPostion = glm::vec3(0.0f, 0.0f, 0.0f);
+	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
+	Engine::CameraController camController{ renderer.GetGLFWwinow(), 20.0f, 10.0f };
+
+	/* Bind keys */
+	BindKeys(camController);
+
+	/* Possess camera */
+	camController.PossessCamera(&cam);
+	
+	/* Phong Light */
+	Engine::PhongLight phongLight;
+	Engine::vec3 pointLightPosition{0.0f, 50.0f, 0.0f};
+	ConfigPhongLight(phongLight, pointLightPosition, cam);
+	
+	Engine::Vertex floorVertices[4];
+	Engine::vec3 positions[1] = {
+		Engine::vec3{-100.0f, -100.0f, 0.0f}
+	};
+	
+	float width[1] = {
+		200.0f
+	};
+	float height[1] = {
+		200.0f
+	};
+	
+	uint32_t floorIndices[6];
+	
+	std::string assetPath{"res/"};
+	Engine::createRectangle(positions, width, height, floorVertices, floorIndices);
+	Engine::Object floor{floorVertices, floorIndices, 4, 6, assetPath};
+	
+	floor.m_TexturesDiffuse.reserve(1);
+	floor.m_TextureSpecular.reserve(1);
+	floor.m_TexturesDiffuse.emplace_back("res/texture/container2.png");
+	floor.m_TextureSpecular.emplace_back("res/texture/container2_specular.png");
+	
+	int floorDiffuseSlot[1] = {0};
+	int floorSpecularSlot[1] = {1};
+	floor.m_Material.BindDiffuseSlots(floorDiffuseSlot, 1);
+	floor.m_Material.BindSpecularSlots(floorSpecularSlot, 1);
+	floor.EnableLight();
+	
+	phongLight.AddObject(floor);
+	
+	glm::mat4 projectionMatrix{glm::perspective(glm::radians(45.0f), 640.0f / 360.0f, 0.1f, 3000.0f)};
+	glm::mat4 floorModelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -140.0f));
+	glm::mat4 normalMat = glm::transpose(glm::inverse(glm::mat3(floorModelMatrix)));
+	floorModelMatrix = glm::rotate(floorModelMatrix, glm::radians(-30.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+	
+	double lastFrameTime = glfwGetTime();
+	while (!renderer.CheckWindowShouldClose())
+	{
+		double thisFrameTime = glfwGetTime();
+		double deltaTime = thisFrameTime - lastFrameTime;
+		lastFrameTime = thisFrameTime;
+		
+		camController.ProcessInput(static_cast<float>(deltaTime));
+		
+		glm::mat4 viewMat = cam.GetViewMatrix();
+		
+		glm::vec3 camPosRealTime = cam.GetPosition();
+
+		phongLight.ConfigMVPMatrix(floorModelMatrix, viewMat, projectionMatrix);
+		phongLight.ConfigNormalMatrix(normalMat);
+		phongLight.ConfigCameraWorldPosition(camPosRealTime);
+		
+		renderer.OnRender();
+		
+		phongLight.TurnOn();
+		floor.OnDraw();
+		renderer.DrawElements(6, nullptr);
+		phongLight.TurnOff();
+		
+		renderer.Render();
 	}
 }
 

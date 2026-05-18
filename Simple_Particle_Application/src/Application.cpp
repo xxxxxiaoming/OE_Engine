@@ -10,7 +10,8 @@ int main()
 	//StencilTestExperiment(std::string{ "res/assets/backpack/backpack.obj" }, renderer);
 	// RenderTargetExperiment(renderer);
 	// DrawASimpleHouseUsingGS(renderer);
-	InstanceExperiment(renderer);
+	// InstanceExperiment(renderer);
+	AdvancedLighting(renderer);
 	renderer.Clear();
 	return 0;
 }
