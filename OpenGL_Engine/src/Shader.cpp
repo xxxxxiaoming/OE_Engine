@@ -6,14 +6,14 @@
 #include "Shader.h"
 #include "Helper.h"
 
-Engine::Shader::Shader(const char* vsSource, const char* faSource)
+Engine::Shader::Shader(const char* vsSource, const char* faSource, const char* gsShader)
 {
-    CreateShaderFromSourceInternal(vsSource, faSource);
+    CreateShaderFromSourceInternal(vsSource, faSource, gsShader);
 }
 
-Engine::Shader::Shader(const std::string& vsFile, const std::string& fsFile)
+Engine::Shader::Shader(const std::string& vsFile, const std::string& fsFile, const std::string& gsFile)
 {
-    CreateShaderInternal(vsFile, fsFile);
+    CreateShaderInternal(vsFile, fsFile, gsFile);
 }
 
 
@@ -44,9 +44,9 @@ void Engine::Shader::Delete()
     }
 }
 
-void Engine::Shader::CreateShader(const std::string& vsFile, const std::string& fsFile)
+void Engine::Shader::CreateShader(const std::string& vsFile, const std::string& fsFile, const std::string& gsFile)
 {
-    CreateShaderInternal(vsFile, fsFile);
+    CreateShaderInternal(vsFile, fsFile, gsFile);
 }
 
 unsigned int Engine::Shader::CompileShaderInternal(const char* source, const unsigned int type)
@@ -82,7 +82,7 @@ unsigned int Engine::Shader::CompileShaderInternal(const char* source, const uns
     return shaderID;
 }
 
-void Engine::Shader::CreateShaderFromSourceInternal(const char* vsSource, const char* fsSource)
+void Engine::Shader::CreateShaderFromSourceInternal(const char* vsSource, const char* fsSource, const char* gsSource)
 {
     if (m_ShaderID == 0)
     {
@@ -91,6 +91,7 @@ void Engine::Shader::CreateShaderFromSourceInternal(const char* vsSource, const 
     
     uint32_t vsShaderID = 0;
     uint32_t fsShaderID = 0;
+    uint32_t gsShaderID = 0;
     
     if (vsSource != nullptr)
     {
@@ -112,7 +113,17 @@ void Engine::Shader::CreateShaderFromSourceInternal(const char* vsSource, const 
         }
     }
     
-    if (vsShaderID != 0 || fsShaderID != 0)
+    if (gsSource != nullptr)
+    {
+        gsShaderID = CompileShaderInternal(gsSource, GL_GEOMETRY_SHADER);
+        
+        if (gsShaderID !=0 )
+        {
+            GLCALL(glAttachShader(m_ShaderID, gsShaderID));
+        }
+    }
+    
+    if (vsShaderID != 0 || fsShaderID != 0 || gsShaderID != 0)
     {
         GLCALL(glLinkProgram(m_ShaderID));
         
@@ -148,7 +159,7 @@ void Engine::Shader::CreateShaderFromSourceInternal(const char* vsSource, const 
     }
 }
 
-void Engine::Shader::CreateShaderInternal(const std::string& vsFile = std::string{""}, const std::string& fsFile = std::string{""})
+void Engine::Shader::CreateShaderInternal(const std::string& vsFile, const std::string& fsFile, const std::string& gsFile)
 {
     if (m_ShaderID == 0)
     {
@@ -157,8 +168,10 @@ void Engine::Shader::CreateShaderInternal(const std::string& vsFile = std::strin
     
     std::string vsSource{};
     std::string fsSource{};
+    std::string gsSource{};
     unsigned int vsShaderID = 0;
     unsigned int fsShaderID = 0;
+    unsigned int gsShaderID = 0;
     
     if (not vsFile.empty())
     {
@@ -199,8 +212,27 @@ void Engine::Shader::CreateShaderInternal(const std::string& vsFile = std::strin
             }
         }
     }
+    
+    if (not gsFile.empty())
+    {
+        std::fstream gsFileStream{gsFile};
+        
+        if (gsFileStream)
+        {
+            std::stringstream ss;
+            ss << gsFileStream.rdbuf();
+            gsSource = ss.str();
+            
+            gsShaderID  = CompileShaderInternal(gsSource.c_str(), GL_GEOMETRY_SHADER);
+            
+            if(gsShaderID != 0)
+            {
+                GLCALL(glAttachShader(m_ShaderID, gsShaderID));
+            }
+        }
+    }
  
-    if (vsShaderID != 0 || fsShaderID != 0)
+    if (vsShaderID != 0 || fsShaderID != 0 || gsShaderID != 0)
     {
         GLCALL(glLinkProgram(m_ShaderID));
         
@@ -229,6 +261,11 @@ void Engine::Shader::CreateShaderInternal(const std::string& vsFile = std::strin
             if (fsShaderID != 0)
             {
                 GLCALL(glDeleteShader(fsShaderID));
+            }
+            
+            if (gsShaderID != 0)
+            {
+                GLCALL(glDeleteShader(gsShaderID));
             }
             
             GLCALL(glValidateProgram(m_ShaderID));

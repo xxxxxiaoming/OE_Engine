@@ -180,7 +180,7 @@ void RenderTargetExperiment(Engine::Renderer& renderer)
 		
 		matForRect.UseMaterial();
 		rectObj.OnDraw();
-		renderer.DrawElements(rectObj.GetIndexCount(), nullptr);
+		renderer.DrawElements(static_cast<int>(rectObj.GetIndexCount()), nullptr);
 		
 		renderer.Render();
 	}
@@ -256,7 +256,6 @@ void StencilTestExperiment(const std::string& path, Engine::Renderer& renderer)
 
 		renderer.OnRender();
 		
-
 		glm::vec3 camPosRealTime = cam.GetPosition();
 		glm::vec3 camFrontRealTime = cam.GetFront();
 		
@@ -291,4 +290,44 @@ void StencilTestExperiment(const std::string& path, Engine::Renderer& renderer)
 
 		renderer.Render();
 	}
+}
+
+void DrawASimpleHouseUsingGS(Engine::Renderer& renderer)
+{
+	/* Draw a simple house by using geometry shader */
+	Engine::Vertex vertices[] = {
+		Engine::Vertex{{-0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 0.7f, 1.0f}, 0.0f},
+		Engine::Vertex{{0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 0.7f, 1.0f}, 0.0f},
+		Engine::Vertex{{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 0.7f, 1.0f}, 0.0f},
+		Engine::Vertex{{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 0.7f, 1.0f}, 0.0f},
+	};
+	uint32_t indices[] = {
+		0, 1, 2, 3
+	};
+	
+	std::string assetDirector = "res/";
+	Engine::Object houseObject{vertices, indices, 4, 4, assetDirector};
+	
+	houseObject.DisableLight();
+	
+	std::string vsFile = "res/shader/SimpleHouseVS.vert";
+	std::string gsFile = "res/shader/SimpleHouseGS.geom";
+	std::string fsFile = "res/shader/SimpleHouseFS.frag";
+	Engine::Shader houseShader{vsFile, fsFile, gsFile};
+	Engine::Material houseMaterial;
+	
+	houseMaterial.BindShader(&houseShader);
+	
+	while (!renderer.CheckWindowShouldClose())
+	{
+		houseMaterial.UseMaterial();
+		
+		renderer.OnRender();
+		houseObject.OnDraw();
+		renderer.DrawElements(4, nullptr, GL_POINTS);
+		renderer.Render();
+	}
+	
+	houseObject.Destroy();
+	houseShader.Delete();
 }
