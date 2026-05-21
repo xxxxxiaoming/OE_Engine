@@ -2,6 +2,9 @@
 
 #include <array>
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 namespace Engine
 {
 	enum class Operations
@@ -44,7 +47,16 @@ namespace Engine
         vec4 color;
         float textureSlot;
     };
-
+	
+	struct Transform
+	{
+		glm::vec3 scale{1.0f, 1.0f, 1.0f};		// Scale of x, y, z
+		glm::vec3 translation{0.0f, 0.0f, 0.0f};  // Translation of x, y, z
+		glm::vec3 rotation{0.0f, 0.0f, 0.0f};		// rotation angle around x, y, z
+	};
+	
+	glm::mat4 GenerateModelMatrix(const Transform& transform);
+	
     template <size_t SIZE = 1>
 	void createRectangle(const vec3* positions, const float* width, const float* height, Vertex* vertices, uint32_t* indices)
 	{

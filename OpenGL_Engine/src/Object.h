@@ -26,14 +26,18 @@ namespace Engine
 
 		bool m_Cleared = false;
 		bool m_EnableLight = false;
+		
+		glm::mat4 m_Transform;
+		glm::mat3 m_NormalMatrix;
 	public:
 		std::string m_AssetDirectory;
 		
 		Material m_Material;
+		std::vector<Texture> m_TexturesAmbient;
 		std::vector<Texture> m_TexturesDiffuse;
 		std::vector<Texture> m_TextureSpecular;
 		
-		Object(const Vertex* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t indexCount, std::string& assetDirectory);
+		Object(const Vertex* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t indexCount, std::string& assetDirectory, const Transform& transform = Transform{});
 		~Object();
 
 		void OnDraw();
@@ -48,6 +52,14 @@ namespace Engine
 		inline IndexBuffer& GetIBO()  { return m_IBO; }
 		inline uint32_t GetIndexCount() const { return m_IndexCount; }
 		inline uint32_t GetVertexCount() const { return m_VertexCount; }
+		inline glm::mat4 GetTransform() const { return m_Transform; }
+		inline glm::mat3 GetNormalMatrix() const { return m_NormalMatrix; }
+		
+		inline void SetTransform(const Transform& transform)
+		{
+			m_Transform = GenerateModelMatrix(transform);
+			m_NormalMatrix = glm::transpose(glm::inverse(glm::mat3(m_Transform)));
+		}
 	};
 }
 

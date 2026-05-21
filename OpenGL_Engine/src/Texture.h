@@ -21,9 +21,10 @@ namespace Engine
         int m_Slot = 0;
 
         Texture();
+        Texture(uint32_t color);
         Texture(const Texture& texture) noexcept;
         Texture(Texture&& texture) noexcept;
-        Texture(const std::string& fileName);
+        Texture(const std::string& fileName, bool bFlipVertical = true);
         ~Texture();
 
         Texture& operator=(const Texture& texture) noexcept;

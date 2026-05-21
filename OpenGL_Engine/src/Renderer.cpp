@@ -82,6 +82,14 @@ void Engine::Renderer::SetViewportAll(unsigned int x, unsigned int y, int width,
     m_ViewportHeight = height;
 }
 
+void Engine::Renderer::GetViewPortAll(unsigned int& x, unsigned int& y, int& width, int& height)
+{
+    x = m_ViewportX;
+    y = m_ViewportY;
+    width = m_ViewportWidth;
+    height = m_ViewportHeight;
+}
+
 const GLFWwindow* Engine::Renderer::GetGLFWwinow() const
 {
     return m_Window;

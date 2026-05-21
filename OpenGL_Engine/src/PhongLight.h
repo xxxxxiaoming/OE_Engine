@@ -1,6 +1,7 @@
 #pragma once
 #include "Shader.h"
 #include "Model.h"
+#include "ShadowMap.h"
 #include "Type.h"
 
 namespace  Engine
@@ -9,13 +10,24 @@ namespace  Engine
     {
     private:
         Shader m_Shader;
+        ShadowMap m_ShadowMap;
         int m_PointLightIndex = 0;
         int m_SpotLightIndex = 0;
-    public:
-        PhongLight();
         
-        void TurnOn() const;
-        void TurnOff() const;
+        std::unordered_map<std::string, Model*> m_Models;
+        std::unordered_map<std::string, Object*> m_Objects;
+        bool m_ShadowMapCaptured = false;
+        
+        void BlockModelInternal(Model* model) {model->BindShader(nullptr); model->DisableLight();}
+        void BlockObjectInternal(Object* object) {object->m_Material.BindShader(nullptr);object->DisableLight();}
+        void UnblockModelInternal(Model* model) {model->BindShader(&m_Shader);model->EnableLight();}
+        void UnblockObjectInternal(Object* object) {object->m_Material.BindShader(&m_Shader);object->EnableLight();}
+        void GenerateShadowMapInternal(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
+    public:
+        PhongLight(int shadowMapResolution = 1024);
+        
+        void TurnOn(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
+        void TurnOff(Renderer& renderer) const;
         
         void ConfigDirectionLight(const vec3& direction, const vec3& ambient, const vec3& diffuse, const vec3& specular);
         void EnableDirectionLight();
@@ -37,10 +49,12 @@ namespace  Engine
         void ConfigNormalMatrix(const glm::mat3& normalMatrix);
         void ConfigCameraWorldPosition(const glm::vec3& position);
         
-        void AddModel(Model& model) { model.BindShader(&m_Shader); model.EnableLight(); }
-        void AddObject(Object& object) { object.m_Material.shader = &m_Shader; object.EnableLight();}
+        void ConfigShadowMapCaptureView(glm::vec3 capturePosition, glm::vec3 captureLookAt, float viewLeft, float viewRight, float viewBottom, float viewTop, float viewNear, float viewFar);
         
-        void RemoveModel(Model& model) {model.BindShader(nullptr); model.DisableLight();}
-        void RemoveObject(Object& object) {object.m_Material.shader = nullptr; object.DisableLight();}
+        void AddModel(const std::string& name, Model* model);
+        void AddObject(const std::string& name, Object* object);
+        
+        void RemoveModel(const std::string& name);
+        void RemoveObject(const std::string& name);
     };
 }

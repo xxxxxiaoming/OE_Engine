@@ -11,12 +11,14 @@ namespace Engine
 	struct Material
 	{
 		Shader* shader = nullptr;
+		int ambient[MAX_TEXTURES]{};
 		int diffuse[MAX_TEXTURES]{}; // texture slot(diffuse) aka 这个材质对象使用的diffuse纹理插槽
 		int specular[MAX_TEXTURES]{};// texture slot(diffuse) aka 这个材质对象使用的specular纹理插槽
 		uint32_t shininess = 8;
 		
 		void UseMaterial()  const;
 		void UnuseMaterial() const;
+		void BindAmbientSlots(int* slots, int slotsNum);
 		void BindDiffuseSlots(int* slots, int slotsNum);
 		void BindSpecularSlots(int* slots, int slotsNum);
 

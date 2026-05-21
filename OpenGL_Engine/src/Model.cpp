@@ -70,44 +70,75 @@ void Engine::Part::ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& 
 
 	/* Load textures */
 	uint32_t materialIndex = mesh->mMaterialIndex;
-	if (materialIndex != 0)
+	Object& object = objects.back();
+		
+	aiMaterial* material = scene->mMaterials[materialIndex];
+	uint32_t ambientNum = material->GetTextureCount(aiTextureType_AMBIENT);
+	uint32_t diffuseNum = material->GetTextureCount(aiTextureType_DIFFUSE);
+	uint32_t specularNum = material->GetTextureCount(aiTextureType_SPECULAR);
+	uint32_t reflctNum = material->GetTextureCount(aiTextureType_REFLECTION);
+	uint32_t normalNum = material->GetTextureCount(aiTextureType_NORMALS);
+		
+	ambientNum = ambientNum > MAX_TEXTURES ? MAX_TEXTURES : ambientNum;
+	diffuseNum = diffuseNum > MAX_TEXTURES ? MAX_TEXTURES : diffuseNum;
+	specularNum = specularNum > MAX_TEXTURES ? MAX_TEXTURES : specularNum;
+
+	object.m_TexturesAmbient.reserve(ambientNum);
+	object.m_TexturesDiffuse.reserve(diffuseNum);
+	object.m_TextureSpecular.reserve(specularNum);
+		
+	for (uint32_t count = 0; count < ambientNum; count++)
 	{
-		Object& object = objects.back();
+		aiString path;
+		std::string fullPath = assetDirectory;
+		material->GetTexture(aiTextureType_AMBIENT, count, &path);
+		object.m_TexturesAmbient.emplace_back(fullPath.append(path.C_Str()));
+			
+		/* 若没有漫反射贴图，则使用环境光贴图作为漫反射贴图 */
+		if (diffuseNum == 0)
+			object.m_TexturesDiffuse.emplace_back(fullPath);
+	}
+
 		
-		aiMaterial* material = scene->mMaterials[materialIndex];
-		uint32_t diffuseNum = material->GetTextureCount(aiTextureType_DIFFUSE);
-		uint32_t specularNum = material->GetTextureCount(aiTextureType_SPECULAR);
-		uint32_t normalNum = material->GetTextureCount(aiTextureType_NORMALS);
-		
-		diffuseNum = diffuseNum > MAX_TEXTURES ? MAX_TEXTURES : diffuseNum;
-		specularNum = specularNum > MAX_TEXTURES ? MAX_TEXTURES : specularNum;
+	for (uint32_t count = 0; count < diffuseNum; count++)
+	{
+		aiString path;
+		std::string fullPath = assetDirectory;
+		material->GetTexture(aiTextureType_DIFFUSE, count, &path);
+		object.m_TexturesDiffuse.emplace_back(fullPath.append(path.C_Str()));
+			
+		/* 若没有环境光反射贴图，则使用漫反射贴图作为环境光贴图 */
+		if (ambientNum == 0)object.m_TexturesAmbient.emplace_back(fullPath);
+	}
 
-		object.m_TexturesDiffuse.reserve(diffuseNum);
-		object.m_TextureSpecular.reserve(specularNum);
-
-		for (uint32_t count = 0; count < diffuseNum; count++)
+	if(specularNum == 0)
+	{
+		if (reflctNum > 0)
 		{
-			aiString path;
-			std::string fullPath = assetDirectory;
-			material->GetTexture(aiTextureType_DIFFUSE, count, &path);
-			object.m_TexturesDiffuse.emplace_back(fullPath.append(path.C_Str()));
-		}
-
-		if(specularNum == 0)
-		{
-			/* 没有高光贴图的mesh绑定一张纯黑的默认贴图 */
-			object.m_TextureSpecular.reserve(1);
-			object.m_TextureSpecular.emplace_back("res/texture/default_specular.jpg");
-		}
-		else
-		{
-			for (uint32_t count = 0; count < specularNum; count++)
+			object.m_TextureSpecular.reserve(reflctNum);
+			for (uint32_t count = 0; count < reflctNum; count++)
 			{
 				aiString path;
 				std::string fullPath = assetDirectory;
-				material->GetTexture(aiTextureType_SPECULAR, count, &path);
+				material->GetTexture(aiTextureType_REFLECTION, count, &path);
 				object.m_TextureSpecular.emplace_back(fullPath.append(path.C_Str()));
 			}
+		}
+		else
+		{
+			/* 没有高光贴图的mesh绑定一张纯黑的默认贴图 */
+			object.m_TextureSpecular.reserve(1);
+			object.m_TextureSpecular.emplace_back("res/texture/default_specular.jpg");	
+		}
+	}
+	else
+	{
+		for (uint32_t count = 0; count < specularNum; count++)
+		{
+			aiString path;
+			std::string fullPath = assetDirectory;
+			material->GetTexture(aiTextureType_SPECULAR, count, &path);
+			object.m_TextureSpecular.emplace_back(fullPath.append(path.C_Str()));
 		}
 	}
 
@@ -137,12 +168,19 @@ Engine::Part::~Part()
 	}
 }
 
-Engine::Model::Model(const std::string& path) :
-	m_ModelPath(path)
+Engine::Model::Model(const std::string& path, bool bFlipUV, const Transform& transform) :
+	m_ModelPath(path),
+	m_Transform(GenerateModelMatrix(transform)),
+	m_NormalMatrix(glm::transpose(glm::inverse(glm::mat3(m_Transform))))
 {
 	printf("Loading ...\n");
 	Assimp::Importer importer;
-	const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs);
+	uint32_t importFlags = aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace;
+	
+	if (bFlipUV)
+		importFlags |= aiProcess_FlipUVs;
+	
+	const aiScene* scene = importer.ReadFile(path, importFlags);
 	
 	uint32_t nodeNum = 1;
 	GetChildrenNum(scene->mRootNode, nodeNum);	
@@ -192,6 +230,13 @@ void Engine::Model::BindShader(Shader* shader)
 	for (auto& part : m_Parts)
 		for (auto& object : part.objects)
 			object.m_Material.shader = shader;
+}
+
+void Engine::Model::BindAmbientSlot(int* slots, int slotsNum)
+{
+	for (auto& part : m_Parts)
+		for (auto& object : part.objects)
+			object.m_Material.BindAmbientSlots(slots, slotsNum);
 }
 
 void Engine::Model::BindDiffuseSlot(int* slots, int slotsNum)

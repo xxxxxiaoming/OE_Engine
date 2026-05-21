@@ -5,7 +5,7 @@
 
 // language=GLSL
 const char vsSource[] = R"glsl(
-#version 330 core
+#version 460 core
 
 layout (location = 0) in vec3 vertexPosition;
 
@@ -26,7 +26,7 @@ void main()
 
 // language=GLSL
 const char fsSource[] = R"glsl(
-#version 330 core
+#version 460 core
 
 in vec3 textureDir; // 代表3D纹理坐标的方向向量
 

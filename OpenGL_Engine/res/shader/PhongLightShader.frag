@@ -1,4 +1,4 @@
-﻿#version 330 core
+﻿#version 460 core
 
 const int MAX_POINT_OR_SPOT_LIGHT_NUM = 4;
 

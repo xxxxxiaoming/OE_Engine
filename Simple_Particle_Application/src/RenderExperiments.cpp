@@ -23,30 +23,30 @@ static void ConfigPhongLight(Engine::PhongLight& phongLight, const Engine::vec3&
 	/* 光照配置 */
 	phongLight.EnableDirectionLight();								// 开启方向光源
 	phongLight.ConfigDirectionLight(
-		Engine::vec3{1.0f, 1.0f, 1.0f},
-		Engine::vec3{0.5f,0.5f,0.5f},
+		Engine::vec3{-1.0f, -1.0f, -1.0f},
+		Engine::vec3{0.1f,0.1f,0.1f},
 		Engine::vec3{1.0f,1.0f,1.0f},
-		Engine::vec3{0.7f,0.7f,0.7f}
+		Engine::vec3{1.0f,1.0f,1.0f}
 		);
 	
 	phongLight.AddPointLight(
 		pointLightWorldPosition, 
-		Engine::vec3{0.1f, 0.1f, 0.1f}, 
-		Engine::vec3{0.5f,0.5f,0.5f},
-		Engine::vec3{1.0f, 1.0f, 1.0f},
+		Engine::vec3{0.2f, 0.2f, 0.2f}, 
+		Engine::vec3{0.7f,0.7f,0.7f},
+		Engine::vec3{0.5f, 0.5f, 0.5f},
 		1.0f, 0.001f, 0.0001f
 		);															// 使用1个点光源
 	
-	// glm::vec3 cameraWorldPosition = camera.GetPosition();
-	// glm::vec3 cameraLookDirection = camera.GetFront();
-	// phongLight.AddSpotLight(
-	// 	Engine::vec3{cameraWorldPosition.x, cameraWorldPosition.y, cameraWorldPosition.z},
-	// 	Engine::vec3{cameraLookDirection.x, cameraLookDirection.y, cameraLookDirection.z},
-	// 	Engine::vec3{0.1f, 0.1f, 0.1f},
-	// 	Engine::vec3{0.5f, 0.5f, 0.5f},
-	// 	Engine::vec3{0.3f, 0.3f, 0.3f},
-	// 	5.0f, 10.0f, 1.0f, 0.001f, 0.0001f
-	// 	);															// 使用1个聚光源
+	glm::vec3 cameraWorldPosition = camera.GetPosition();
+	glm::vec3 cameraLookDirection = camera.GetFront();
+	phongLight.AddSpotLight(
+		Engine::vec3{cameraWorldPosition.x, cameraWorldPosition.y, cameraWorldPosition.z},
+		Engine::vec3{cameraLookDirection.x, cameraLookDirection.y, cameraLookDirection.z},
+		Engine::vec3{0.1f, 0.1f, 0.1f},
+		Engine::vec3{0.7f, 0.7f, 0.7f},
+		Engine::vec3{0.5f, 0.5f, 0.5f},
+		50.0f, 70.0f, 1.0f, 0.001f, 0.0001f
+		);															// 使用1个聚光源
 }
 
 void GenerateRocksModelMatrices(int amount, float minOrbitRadius, float maxOrbitRadius, float zOffset, glm::mat4* matrices)
@@ -69,9 +69,9 @@ void GenerateRocksModelMatrices(int amount, float minOrbitRadius, float maxOrbit
 void AdvancedLighting(Engine::Renderer& renderer)
 {
 	/* Camera and controller */
-	glm::vec3 camPostion = glm::vec3(0.0f, 0.0f, 0.0f);
-	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
-	Engine::CameraController camController{ renderer.GetGLFWwinow(), 20.0f, 10.0f };
+	glm::vec3 camPostion = glm::vec3(0.0f, 200.0f, 0.0f);
+	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 0.0f, -100.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
+	Engine::CameraController camController{ renderer.GetGLFWwinow(), 100.0f, 40.0f };
 
 	/* Bind keys */
 	BindKeys(camController);
@@ -81,44 +81,88 @@ void AdvancedLighting(Engine::Renderer& renderer)
 	
 	/* Phong Light */
 	Engine::PhongLight phongLight;
-	Engine::vec3 pointLightPosition{0.0f, 50.0f, 0.0f};
+	Engine::vec3 pointLightPosition{0.0f, 200.0f, 0.0f};
 	ConfigPhongLight(phongLight, pointLightPosition, cam);
 	
+	/* Shadow Map */
+	glm::vec3 shadowMapCamLookAt = glm::vec3(0.0f, 0.0f, -70.0f); // 精准瞄准 Nanosuit
+	glm::vec3 shadowMapCaptureCamPos = shadowMapCamLookAt + glm::vec3(150.0f, 150.0f, 150.0f); // 把光源相机拉近
+
+	// 将投影矩阵的宽高大幅度缩小到 300x300，让 1024 贴图的像素密度暴增！
+	phongLight.ConfigShadowMapCaptureView(
+		shadowMapCaptureCamPos, 
+		shadowMapCamLookAt, 
+		-150.0f, 150.0f, // Left, Right (宽度缩减到300)
+		-150.0f, 150.0f, // Bottom, Top (高度缩减到300)
+		0.1f, 500.0f     // Near, Far
+	);
+	
+	constexpr float sizeX = 2000.0f;
+	constexpr float sizeY = 2000.0f;
 	Engine::Vertex floorVertices[4];
 	Engine::vec3 positions[1] = {
-		Engine::vec3{-100.0f, -100.0f, 0.0f}
+		Engine::vec3{-sizeX / 2.0f, -sizeY / 2.0f, 0.0f}
 	};
 	
 	float width[1] = {
-		200.0f
+		sizeX
 	};
 	float height[1] = {
-		200.0f
+		sizeY
 	};
 	
 	uint32_t floorIndices[6];
 	
 	std::string assetPath{"res/"};
 	Engine::createRectangle(positions, width, height, floorVertices, floorIndices);
-	Engine::Object floor{floorVertices, floorIndices, 4, 6, assetPath};
 	
+	for (int index = 0 ; index < 4 ; index++)
+	{
+		Engine::Vertex& vertex = floorVertices[index];
+		vertex.texCoord.x *= 10;
+		vertex.texCoord.y *= 10;
+	}
+	
+	Engine::Transform floorTransform = {
+		glm::vec3(1.0f, 1.0f, 1.0f),
+		glm::vec3(0.0f, 0.0f, -140.0f),
+		glm::vec3(-90.0f, 0.0f, 0.0f)
+	};
+	Engine::Object floor{floorVertices, floorIndices, 4, 6, assetPath, floorTransform};
+	
+	floor.m_TexturesAmbient.reserve(1);
 	floor.m_TexturesDiffuse.reserve(1);
 	floor.m_TextureSpecular.reserve(1);
+	floor.m_TexturesAmbient.emplace_back("res/texture/container2.png");
 	floor.m_TexturesDiffuse.emplace_back("res/texture/container2.png");
 	floor.m_TextureSpecular.emplace_back("res/texture/container2_specular.png");
 	
-	int floorDiffuseSlot[1] = {0};
-	int floorSpecularSlot[1] = {1};
+	int floorDiffuseSlot[1] = {1};
+	int floorSpecularSlot[1] = {2};
+	floor.m_Material.BindAmbientSlots(floorDiffuseSlot, 1);
 	floor.m_Material.BindDiffuseSlots(floorDiffuseSlot, 1);
 	floor.m_Material.BindSpecularSlots(floorSpecularSlot, 1);
 	floor.EnableLight();
 	
-	phongLight.AddObject(floor);
+	phongLight.AddObject("floor", &floor);
+	
+	Engine::Transform nanosuitTransform = {
+		glm::vec3(10.0f, 10.0f, 10.0f),
+		glm::vec3(0.0f, 0.0f, -70.0f),
+		glm::vec3(0.0f, 0.0f, 0.0f),
+	};
+	Engine::Model nanoSuit{"res/assets/nanosuit_reflection/nanosuit.obj", false, nanosuitTransform};
+	
+	int nanosuitAmbientSlot[1] = {3};
+	int nanoSuitDiffuseSlot[1] = {4};
+	int nanoSuitSpecularSlot[1] = {5};
+	nanoSuit.BindAmbientSlot(nanosuitAmbientSlot, 1);
+	nanoSuit.BindDiffuseSlot(nanoSuitDiffuseSlot, 1);
+	nanoSuit.BindSpecularSlot(nanoSuitSpecularSlot, 1);
+	
+	phongLight.AddModel("nanosuit", &nanoSuit);
 	
 	glm::mat4 projectionMatrix{glm::perspective(glm::radians(45.0f), 640.0f / 360.0f, 0.1f, 3000.0f)};
-	glm::mat4 floorModelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -140.0f));
-	glm::mat4 normalMat = glm::transpose(glm::inverse(glm::mat3(floorModelMatrix)));
-	floorModelMatrix = glm::rotate(floorModelMatrix, glm::radians(-30.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 	
 	double lastFrameTime = glfwGetTime();
 	while (!renderer.CheckWindowShouldClose())
@@ -130,19 +174,21 @@ void AdvancedLighting(Engine::Renderer& renderer)
 		camController.ProcessInput(static_cast<float>(deltaTime));
 		
 		glm::mat4 viewMat = cam.GetViewMatrix();
-		
 		glm::vec3 camPosRealTime = cam.GetPosition();
-
-		phongLight.ConfigMVPMatrix(floorModelMatrix, viewMat, projectionMatrix);
-		phongLight.ConfigNormalMatrix(normalMat);
+		glm::vec3 camFrontRealTime = cam.GetFront();
+		
 		phongLight.ConfigCameraWorldPosition(camPosRealTime);
+		
+		/* 每帧更新聚光源的位置，模拟控制手电筒^-^ */
+		phongLight.ConfigSpotLightPosition(0, Engine::vec3{camPosRealTime.x, camPosRealTime.y, camPosRealTime.z});
+		phongLight.ConfigSpotLightDirection(0, Engine::vec3{camFrontRealTime.x, camFrontRealTime.y, camFrontRealTime.z});
 		
 		renderer.OnRender();
 		
-		phongLight.TurnOn();
-		floor.OnDraw();
-		renderer.DrawElements(6, nullptr);
-		phongLight.TurnOff();
+		/* Draw Scene */
+		phongLight.TurnOn(renderer, viewMat, projectionMatrix);
+		phongLight.TurnOff(renderer);
+		
 		
 		renderer.Render();
 	}
@@ -225,17 +271,17 @@ void InstanceExperiment(Engine::Renderer& renderer)
 		
 		renderer.OnRender();
 		
-		planetShader.Use();
 		planetShader.SetUniformMatrix4f("u_Model", planetModelMatrix);
 		planetShader.SetUniformMatrix4f("u_View", viewMatrix);
 		planetShader.SetUniformMatrix4f("u_Projection", projectionMatrix);
 		planetShader.SetUniform1i("u_Diffuse", 0);
+		planetShader.Use();
 		planet.Draw(renderer);
 		
-		rockShader.Use();
 		rockShader.SetUniformMatrix4f("u_View", viewMatrix);
 		rockShader.SetUniformMatrix4f("u_Projection", projectionMatrix);
 		rockShader.SetUniform1i("u_Diffuse", 2);
+		rockShader.Use();
 		rock.DrawInstanced(renderer, asteroidAmount);
 		
 		renderer.Render();
@@ -351,7 +397,7 @@ void RenderTargetExperiment(Engine::Renderer& renderer)
 		// phongLight.TurnOn();
 		GLCALL(glActiveTexture(GL_TEXTURE0));
 		GLCALL(glBindTexture(GL_TEXTURE_CUBE_MAP, skyBox.GetSkyBoxCubeMap()));
-		skyBoxReflectShader.Use();
+
 		skyBoxReflectShader.SetUniform1i("u_CubeMap", 0);
 		skyBoxReflectShader.SetUniformMatrix4f("u_Model", modelMat);
 		skyBoxReflectShader.SetUniformMatrix4f("u_View", viewMat);
@@ -359,6 +405,7 @@ void RenderTargetExperiment(Engine::Renderer& renderer)
 		skyBoxReflectShader.SetUniform3f("u_CameraPosition", camPosRealTime.x, camPosRealTime.y, camPosRealTime.z);
 		skyBoxReflectShader.SetUniform3f("u_LightPosition", lightWorldPos.x, lightWorldPos.y, lightWorldPos.z);
 		skyBoxReflectShader.SetUniformMatrix3f("u_NormalMat", normalMat);
+		skyBoxReflectShader.Use();
 		model.Draw(renderer);
 		// phongLight.TurnOff();
 		
@@ -463,14 +510,12 @@ void StencilTestExperiment(const std::string& path, Engine::Renderer& renderer)
 		renderer.SetStencilFunc(GL_ALWAYS, 1, 0xFF);
 		renderer.SetStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 		
-		phongLight.AddModel(model);
-		phongLight.TurnOn();
-		model.Draw(renderer);
-		phongLight.TurnOff();
+		phongLight.AddModel("backpack", &model);
+		phongLight.TurnOn(renderer, viewMat, projectionMat);
+		// model.Draw(renderer);
+		phongLight.TurnOff(renderer);
 
 		model.BindShader(&shaderFrame);
-		
-		shaderFrame.Use();
 
 		shaderFrame.SetUniformMatrix4f("u_Model", modelMatFrame);
 		shaderFrame.SetUniformMatrix4f("u_View", viewMat);
@@ -479,7 +524,10 @@ void StencilTestExperiment(const std::string& path, Engine::Renderer& renderer)
 
 		renderer.SetStencilFunc(GL_NOTEQUAL, 1, 0xFF);
 		renderer.SetStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+		
+		shaderFrame.Use();
 		model.Draw(renderer);
+		shaderFrame.UnUse();
 
 		renderer.Render();
 	}

@@ -31,6 +31,8 @@ namespace Engine
 	private:
 		std::string m_ModelPath;
 		std::vector<Part> m_Parts;
+		glm::mat4 m_Transform;
+		glm::mat3 m_NormalMatrix;
 
 		bool m_Destroyed = false;
 
@@ -42,12 +44,13 @@ namespace Engine
 	public:
 		uint32_t m_VBOIntanced = 0;
 		
-		Model(const std::string& path);
+		Model(const std::string& path, bool FlipUV = true, const Transform& transform = Transform());
 		~Model();
 
 		void Destroy();
 
 		void BindShader(Shader* shader);
+		void BindAmbientSlot(int* slots, int slotsNum);
 		void BindDiffuseSlot(int* slots, int slotsNum);
 		void BindSpecularSlot(int* slots, int slotsNum);
 		void Draw(const Renderer& renderer);
@@ -60,5 +63,13 @@ namespace Engine
 		
 		size_t GetPartsCount() const;
 		size_t GetObjectsCount() const;
+		glm::mat4 GetTransform() const { return m_Transform; }
+		glm::mat3 GetNormalMatrix() const { return m_NormalMatrix; }
+		
+		void SetTransform(const Transform& transform)
+		{
+			m_Transform = GenerateModelMatrix(transform);
+			m_NormalMatrix = glm::transpose(glm::inverse(glm::mat3(m_Transform)));
+		}
 	};
 }

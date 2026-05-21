@@ -2,8 +2,12 @@
 #include <assimp/types.h>
 #include "Object.h"
 
-Engine::Object::Object(const Vertex* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t indexCount, std::string& assetDirectory) :  
-	m_VertexCount(vertexCount), m_IndexCount(indexCount), m_AssetDirectory(assetDirectory)
+Engine::Object::Object(const Vertex* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t indexCount, std::string& assetDirectory, const Transform& transform) :  
+	m_VertexCount(vertexCount), 
+	m_IndexCount(indexCount), 
+	m_AssetDirectory(assetDirectory), 
+	m_Transform(GenerateModelMatrix(transform)), 
+	m_NormalMatrix(glm::transpose(glm::inverse(glm::mat3(m_Transform))))
 {
 	m_VAO.Bind();
 	
@@ -39,6 +43,9 @@ void Engine::Object::OnDraw()
 	m_VAO.Bind();
 	
 	/* Model.cpp load texture 的时候，已经限制了load texture的数量为MAX_TEXTURES，跟一个Material对象能够使用的纹理数量一致 */
+	for (int index = 0; index < m_TexturesAmbient.size(); index++)
+		m_TexturesAmbient[index].Bind(m_Material.ambient[index]);
+	
 	for (int index = 0; index < m_TexturesDiffuse.size(); index++)
 		m_TexturesDiffuse[index].Bind(m_Material.diffuse[index]);
 
@@ -55,6 +62,7 @@ void Engine::Object::OnDraw()
 	
 	/* 目前先约定shader中，material结构体都是按照由下面的数据构成的。 */
 	/* 目前先固定使用1张diffuse跟1张specular，之后再扩展了 */
+	m_Material.shader->SetUniform1i("u_Material.ambient", m_Material.ambient[0]);
 	m_Material.shader->SetUniform1i("u_Material.diffuse", m_Material.diffuse[0]);
 	m_Material.shader->SetUniform1i("u_Material.specular", m_Material.specular[0]);
 	m_Material.shader->SetUniform1i("u_Material.shininess", m_Material.shininess);

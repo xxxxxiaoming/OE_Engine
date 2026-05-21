@@ -23,6 +23,8 @@ namespace  Engine
         void SetViewportPosition(unsigned int x, unsigned int y);
         void SetViewportAll(unsigned int x, unsigned int y, int width, int height);
         
+        void GetViewPortAll(unsigned int& x, unsigned int& y, int& width, int& height);
+        
         const GLFWwindow* GetGLFWwinow() const;
         bool CheckWindowShouldClose() const { return glfwWindowShouldClose(const_cast<GLFWwindow*>(m_Window)); }
         
