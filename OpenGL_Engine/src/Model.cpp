@@ -9,7 +9,7 @@
 #include "Material.h"
 #include "Type.h"
 
-Engine::Part::Part(const aiNode* node, const aiScene* scene, uint8_t indicesOfOneFace, std::string& assetDirectory) :
+Engine::Part::Part(const aiNode* node, const aiScene* scene, uint8_t indicesOfOneFace, std::string& assetDirectory, std::string& format) :
 	indicesPerFace(indicesOfOneFace)
 {
 	objects.reserve(node->mNumMeshes);
@@ -17,13 +17,13 @@ Engine::Part::Part(const aiNode* node, const aiScene* scene, uint8_t indicesOfOn
 	{
 		uint32_t meshIndex = node->mMeshes[index];
 		aiMesh* mesh = scene->mMeshes[meshIndex];
-		ProcessMesh(mesh, scene, assetDirectory);
+		ProcessMesh(mesh, scene, assetDirectory, format);
 	}
 
 	name = node->mName.C_Str();
 }
 
-void Engine::Part::ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& assetDirectory)
+void Engine::Part::ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& assetDirectory, std::string& format)
 {
 	if (!mesh->HasPositions())
 		return;
@@ -52,6 +52,14 @@ void Engine::Part::ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& 
 			aiColor4D aiVertexColor = mesh->mColors[0][count];
 			vertices[count].color = vec4{ aiVertexColor.r, aiVertexColor.g, aiVertexColor.b, aiVertexColor.a };
 		}
+		
+		if (mesh->HasTangentsAndBitangents())
+		{
+			aiVector3D aiTangent = mesh->mTangents[count];
+			aiVector3D aiBitangent = mesh->mBitangents[count];
+			vertices[count].bitangent = vec3{ aiBitangent.x, aiBitangent.y, aiBitangent.z };
+			vertices[count].tangent = vec3{ aiTangent.x, aiTangent.y, aiTangent.z };
+		}
 
 		vertices[count].textureSlot = 0.0f;
 	}
@@ -77,8 +85,7 @@ void Engine::Part::ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& 
 	uint32_t diffuseNum = material->GetTextureCount(aiTextureType_DIFFUSE);
 	uint32_t specularNum = material->GetTextureCount(aiTextureType_SPECULAR);
 	uint32_t reflctNum = material->GetTextureCount(aiTextureType_REFLECTION);
-	uint32_t normalNum = material->GetTextureCount(aiTextureType_NORMALS);
-		
+	
 	ambientNum = ambientNum > MAX_TEXTURES ? MAX_TEXTURES : ambientNum;
 	diffuseNum = diffuseNum > MAX_TEXTURES ? MAX_TEXTURES : diffuseNum;
 	specularNum = specularNum > MAX_TEXTURES ? MAX_TEXTURES : specularNum;
@@ -141,6 +148,34 @@ void Engine::Part::ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& 
 			object.m_TextureSpecular.emplace_back(fullPath.append(path.C_Str()));
 		}
 	}
+	
+	/* 法线贴图 */
+	if (format == "obj")
+	{
+		uint32_t normalNum = material->GetTextureCount(aiTextureType_HEIGHT);
+		normalNum = normalNum > MAX_TEXTURES ? MAX_TEXTURES : normalNum;
+		
+		if (normalNum > 0)
+		{
+			object.m_TextureNormal.reserve(normalNum);
+			for (uint32_t count = 0; count < normalNum; count++)
+			{
+				aiString path;
+				std::string fullPath = assetDirectory;
+				material->GetTexture(aiTextureType_HEIGHT, count, &path);
+				object.m_TextureNormal.emplace_back(fullPath.append(path.C_Str()));
+			}
+		}
+		else
+		{
+			object.m_TextureNormal.reserve(1);
+			object.m_TextureNormal.emplace_back(0xFFFF8080);
+		}
+	}
+	else
+	{
+		// TODO : Deal with other formats
+	}
 
 	std::free(vertices);
 	std::free(indices);
@@ -187,17 +222,18 @@ Engine::Model::Model(const std::string& path, bool bFlipUV, const Transform& tra
 	m_Parts.reserve(nodeNum);
 
 	std::string assetDirectory = path.substr(0, path.find_last_of('/') + 1);
-	ProcessNode(scene->mRootNode, scene, assetDirectory);
+	std::string format = path.substr(path.find_last_of('.') + 1);
+	ProcessNode(scene->mRootNode, scene, assetDirectory, format);
 
 	printf("Loading completed\n");
 }
 
-void Engine::Model::ProcessNode(const aiNode* node, const aiScene* scene, std::string& assetDirectory)
+void Engine::Model::ProcessNode(const aiNode* node, const aiScene* scene, std::string& assetDirectory, std::string& format)
 {
 	printf("Process Node: %s\n", node->mName.C_Str());
-	m_Parts.emplace_back(node, scene, 3, assetDirectory);
+	m_Parts.emplace_back(node, scene, 3, assetDirectory, format);
 	for (uint32_t count = 0; count < node->mNumChildren; count++)
-		ProcessNode(node->mChildren[count], scene, assetDirectory);
+		ProcessNode(node->mChildren[count], scene, assetDirectory, format);
 }
 
 void Engine::Model::GetChildrenNum(aiNode* node, uint32_t& count)
@@ -251,6 +287,13 @@ void Engine::Model::BindSpecularSlot(int* slots, int slotsNum)
 	for (auto& part : m_Parts)
 		for (auto& object : part.objects)
 			object.m_Material.BindSpecularSlots(slots, slotsNum);
+}
+
+void Engine::Model::BindNormalSlot(int* slots, int slotsNum)
+{
+	for (auto& part : m_Parts)
+		for (auto& object : part.objects)
+			object.m_Material.BindNormalSlots(slots, slotsNum);
 }
 
 void Engine::Model::Draw(const Renderer& renderer)

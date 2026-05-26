@@ -1,16 +1,22 @@
 #pragma once
 #include "Shader.h"
 #include "Model.h"
-#include "ShadowMap.h"
+#include "ShadowMapDirection.h"
+#include "ShadowMapPoint.h"
 #include "Type.h"
 
 namespace  Engine
 {
+    /* 
+     * 4个点光源的深度cubemap依次绑定到1，2，3，4这四个纹理槽位
+     * 0，1，2，3，4这个5个纹理槽位是Engine保留的，不会被 Application 占用
+     */
     class PhongLight
     {
     private:
         Shader m_Shader;
-        ShadowMap m_ShadowMap;
+        ShadowMapDirection m_ShadowMap;
+        std::vector<ShadowMapPoint>  m_ShadowMapPoint;
         int m_PointLightIndex = 0;
         int m_SpotLightIndex = 0;
         
@@ -18,11 +24,16 @@ namespace  Engine
         std::unordered_map<std::string, Object*> m_Objects;
         bool m_ShadowMapCaptured = false;
         
+        int m_ShadowMapResolution = 1024;
+        std::vector<bool> m_PointLightsNeedCapture;
+        
         void BlockModelInternal(Model* model) {model->BindShader(nullptr); model->DisableLight();}
         void BlockObjectInternal(Object* object) {object->m_Material.BindShader(nullptr);object->DisableLight();}
         void UnblockModelInternal(Model* model) {model->BindShader(&m_Shader);model->EnableLight();}
         void UnblockObjectInternal(Object* object) {object->m_Material.BindShader(&m_Shader);object->EnableLight();}
-        void GenerateShadowMapInternal(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
+        void GenerateShadowMapInternal(Renderer& renderer);
+        void GenerateShadowMapPointInternal(Renderer& renderer);
+        void GenerateSpecificShadowMapPointInternal(int index, Renderer& renderer);
     public:
         PhongLight(int shadowMapResolution = 1024);
         
@@ -50,6 +61,7 @@ namespace  Engine
         void ConfigCameraWorldPosition(const glm::vec3& position);
         
         void ConfigShadowMapCaptureView(glm::vec3 capturePosition, glm::vec3 captureLookAt, float viewLeft, float viewRight, float viewBottom, float viewTop, float viewNear, float viewFar);
+        void ConfigShadowMapPointCaptureView(int index, const glm::vec3& captureWorldPosition, float fov, float aspect, float nearPlane, float farPlane);
         
         void AddModel(const std::string& name, Model* model);
         void AddObject(const std::string& name, Object* object);

@@ -1,9 +1,17 @@
 ﻿#include <glad/glad.h>
 #include <stb_image_write.h>
 #include <string>
+#include <filesystem>
 #include "RenderTarget.h"
 
-#include <chrono>
+const std::string pngName[6] = {
+	"right.png",
+	"left.png",
+	"top.png",
+	"bottom.png",
+	"back.png",
+	"front.png"
+};
 
 Engine::RenderTarget::RenderTarget(int width, int height) :
 	m_Width(width), m_Height(height)
@@ -36,6 +44,32 @@ void Engine::RenderTarget::CreateDepthAttachment()
 	
 	GLCALL(glBindTexture(GL_TEXTURE_2D, 0));
 	GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+}
+
+void Engine::RenderTarget::CreateDepthCubeAttachment()
+{
+	GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, m_FBO));
+	GLCALL(glGenTextures(1, &m_DepthCubeAttachment));
+	GLCALL(glBindTexture(GL_TEXTURE_CUBE_MAP, m_DepthCubeAttachment));
+	
+	GLCALL(glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+	GLCALL(glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+	GLCALL(glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
+	GLCALL(glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
+	GLCALL(glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE));
+	
+	for (unsigned int i = 0; i < 6; ++i)
+	{
+		GLCALL(glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, m_Width, m_Height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr));
+	}
+		
+	float defaultColor[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+	GLCALL(glTexParameterfv(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_BORDER_COLOR, defaultColor));
+	
+	GLCALL(glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, m_DepthCubeAttachment, 0));
+	
+	GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+	GLCALL(glBindTexture(GL_TEXTURE_CUBE_MAP, 0));
 }
 
 void Engine::RenderTarget::CreateColorAttachment()
@@ -104,6 +138,7 @@ void Engine::RenderTarget::SaveDepthAttachment(const std::string& path) const
 	float* depthBuffer = static_cast<float*>(std::malloc(static_cast<size_t>(m_Width * m_Height) * sizeof(float)));
 	
 	GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, m_FBO));
+	
 	// 2. 格式必须是 GL_DEPTH_COMPONENT，不是 GL_DEPTH_ATTACHMENT
 	GLCALL(glReadPixels(0,0,m_Width, m_Height, GL_DEPTH_COMPONENT, GL_FLOAT, depthBuffer));
 	GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
@@ -117,11 +152,49 @@ void Engine::RenderTarget::SaveDepthAttachment(const std::string& path) const
 	}
 	
 	stbi_flip_vertically_on_write(true);
+	
 	// 4. 将转换好的 imageBuffer 交给 stb 保存
 	stbi_write_png(path.c_str(), m_Width, m_Height, 1, imageBuffer, m_Width);
 	
 	std::free(depthBuffer);
 	std::free(imageBuffer);
+}
+
+void Engine::RenderTarget::SaveDepthCubeAttachment(const std::string& path) const
+{
+	float* depthBuffer = static_cast<float*>(std::malloc(static_cast<size_t>(m_Width * m_Height) * sizeof(float)));
+	unsigned char* imageBuffer = static_cast<unsigned char*>(std::malloc(static_cast<size_t>(m_Width * m_Height)));
+	
+	GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, m_FBO));
+	
+	for (int i = 0; i < 6; ++i)
+	{
+		GLCALL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_DepthCubeAttachment, 0));
+		GLCALL(glReadPixels(0, 0, m_Width, m_Height, GL_DEPTH_COMPONENT, GL_FLOAT, depthBuffer));
+		
+		for (int j = 0; j < m_Width * m_Height; ++j)
+		{
+			imageBuffer[j] = static_cast<unsigned char>(depthBuffer[j] * 255.0f);
+		}
+		
+		stbi_flip_vertically_on_write(true);
+		
+		std::string fullPath = path + pngName[i];
+		
+		// Ensure path existing. If not, create directory.
+		std::filesystem::path pathObject{path};
+		if (!pathObject.empty() && !std::filesystem::exists(pathObject))
+		{
+			std::filesystem::create_directory(pathObject);
+		}
+		
+		stbi_write_png(fullPath.c_str(), m_Width, m_Height, 1, imageBuffer, m_Width );
+	}
+	
+	// GLCALL(glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, m_DepthCubeAttachment, 0));
+	GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+	std::free(imageBuffer);
+	std::free(depthBuffer);
 }
 
 void Engine::RenderTarget::DeleteFrameBuffer()

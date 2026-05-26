@@ -22,12 +22,16 @@ Engine::Object::Object(const Vertex* vertices, const uint32_t* indices, uint32_t
 	VertexAttribArray::Enable(2);
 	VertexAttribArray::Enable(3);
 	VertexAttribArray::Enable(4);
+	VertexAttribArray::Enable(5);
+	VertexAttribArray::Enable(6);
 	
 	VertexAttribArray::SetPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), offsetof(Vertex, pos));
 	VertexAttribArray::SetPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), offsetof(Vertex, texCoord));
 	VertexAttribArray::SetPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), offsetof(Vertex, textureSlot));
 	VertexAttribArray::SetPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), offsetof(Vertex, normal));
 	VertexAttribArray::SetPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), offsetof(Vertex, color));
+	VertexAttribArray::SetPointer(5, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), offsetof(Vertex, tangent));
+	VertexAttribArray::SetPointer(6, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), offsetof(Vertex, bitangent));
 
 	m_VAO.Unbind();
 }
@@ -52,6 +56,9 @@ void Engine::Object::OnDraw()
 	for (int index = 0; index < m_TextureSpecular.size(); index++)
 		m_TextureSpecular[index].Bind(m_Material.specular[index]);
 	
+	for (int index = 0; index < m_TextureNormal.size(); index++)
+		m_TextureNormal[index].Bind(m_Material.normal[index]);
+	
 	/* Maybe different object will have different shader in the future. So I decide to call UseMaterial here. */
 	/* 开启 phong light的情况下，在 PhongLight::TurnOn() 中 use shader */
 	if (!m_EnableLight)
@@ -65,6 +72,7 @@ void Engine::Object::OnDraw()
 	m_Material.shader->SetUniform1i("u_Material.ambient", m_Material.ambient[0]);
 	m_Material.shader->SetUniform1i("u_Material.diffuse", m_Material.diffuse[0]);
 	m_Material.shader->SetUniform1i("u_Material.specular", m_Material.specular[0]);
+	m_Material.shader->SetUniform1i("u_Material.normal", m_Material.normal[0]);
 	m_Material.shader->SetUniform1i("u_Material.shininess", m_Material.shininess);
 }
 

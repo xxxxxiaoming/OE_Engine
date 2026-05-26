@@ -7,7 +7,7 @@
 
 namespace Engine
 {
-    class ShadowMap
+    class ShadowMapDirection
     {
     private:
         Engine::RenderTarget m_RenderTarget;
@@ -17,8 +17,8 @@ namespace Engine
         bool m_Debug = false;
     
     public:
-        ShadowMap(int resolution, bool debug = false);
-        // ~ShadowMap();
+        ShadowMapDirection(int resolution, bool debug = false);
+        // ~ShadowMapDirection();
         
         
         

@@ -1,8 +1,6 @@
 #include <sstream>
 #include "PhongLight.h"
 
-#include <glm/gtc/constants.hpp>
-
 // language=GLSL
 static const char vsShaderCode[] = R"glsl(
 #version 460 core
@@ -10,6 +8,8 @@ static const char vsShaderCode[] = R"glsl(
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec2 texCoord;
 layout(location = 3) in vec3 normal;
+layout(location = 5) in vec3 tangent;
+layout(location = 6) in vec3 bitangent; 
 
 uniform mat4 u_Model;
 uniform mat4 u_View;
@@ -20,19 +20,25 @@ uniform mat4 u_LightSpace;
 
 out vec2 v_TexCoord;
 out vec3 v_Normal;
-out vec3 v_LookAtLight;
 out vec3 v_LookAtCamera;
 out vec3 v_FragPosition;
 out vec4 v_LightSpacePosition;
+out vec3 v_T;
+out vec3 v_B;
+out vec3 v_N;
 
 void main() {
 	gl_Position = u_Projection * u_View * u_Model * vec4(position, 1.0f);
 	vec4 worldPosition = u_Model * vec4(position, 1.0);
 	v_TexCoord = texCoord;
 	v_Normal = normalize(u_NormalMat * normal);
-	v_LookAtCamera = normalize(u_CameraPosition.xyz - worldPosition.xyz);
+	v_LookAtCamera = u_CameraPosition.xyz - worldPosition.xyz;
 	v_FragPosition = vec3(worldPosition);
     v_LightSpacePosition = u_LightSpace * u_Model * vec4(position, 1.0);
+    mat3 model3 = mat3(u_Model);
+    v_T = model3 * tangent;
+    v_B = model3 * bitangent;
+    v_N = u_NormalMat * normal;
 }
 )glsl";
 
@@ -46,6 +52,7 @@ struct Material {
     sampler2D ambient;
     sampler2D diffuse;  // 材质漫反射贴图
     sampler2D specular; // 材质高光反射贴图
+    sampler2D normal;   // 材质法线贴图
     int shininess;      // 材质镜面反射率（控制高光光斑的大小）
 };
 
@@ -102,18 +109,31 @@ uniform PointLight u_PointLights[MAX_POINT_OR_SPOT_LIGHT_NUM];
 uniform SpotLight u_SpotLights[MAX_POINT_OR_SPOT_LIGHT_NUM];
 uniform Material u_Material;
 uniform sampler2D u_ShadowDepthMap;
+uniform float u_FarPlane;
+uniform samplerCube u_PointLightsDepthMap[MAX_POINT_OR_SPOT_LIGHT_NUM];
 
 in vec2 v_TexCoord;
 in vec3 v_Normal;
 in vec3 v_LookAtCamera;
 in vec3 v_FragPosition;
 in vec4 v_LightSpacePosition;
+in vec3 v_T;
+in vec3 v_B;
+in vec3 v_N;
 
 out vec4 color;
 
 vec3 normal_Normalized;
 vec3 lookAtCamera_Normalized;
 float reflectDamping = 1.0; // 反射衰减系数，镜面反射光的强度衰减
+vec3 sampleOffsetDirections[20] = vec3[]
+(
+   vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1), 
+   vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
+   vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0),
+   vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
+   vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1)
+);
 
 vec3 calcDirectionLight(vec3 sampleColorAmbient, vec3 sampleColorDiffuse, vec3 sampleColorSpecular)
 {
@@ -174,12 +194,15 @@ vec3 calcPointLights(vec3 sampleColorAmbient, vec3 sampleColorDiffuse, vec3 samp
     vec3 lookAtLight = vec3(0.0);
 
     int num = min(u_LightConfig.pointLightNum, MAX_POINT_OR_SPOT_LIGHT_NUM);
+    int samples = 20;
+    float viewDistance = length(v_LookAtCamera);
+    float diskRadius = 0.05;
     for (int i = 0; i < num; ++i)
     {
         PointLight light = u_PointLights[i];
         lookAtLight = light.position - v_FragPosition;
 
-        float lightDistance = length(light.position - v_FragPosition);
+        float lightDistance = length(lookAtLight);
         attenuation = 1.0 / (light.constant + light.linear * lightDistance + light.quadratic * lightDistance * lightDistance);
         
         ambientLight = light.color.ambient * sampleColorAmbient;
@@ -187,11 +210,24 @@ vec3 calcPointLights(vec3 sampleColorAmbient, vec3 sampleColorDiffuse, vec3 samp
         diffuse = max(dot(normal_Normalized, normalize(lookAtLight)), 0.0);
         diffuseLight = diffuse * light.color.diffuse * sampleColorDiffuse;
 
+        float bias = 0.05;
+        float shadowDebuff = 0.0;
+        
+        for(int j = 0; j < samples; ++j)
+        {
+            float closestDepth = texture(u_PointLightsDepthMap[i], normalize(-lookAtLight) + sampleOffsetDirections[j] * diskRadius).r;
+            closestDepth *= u_FarPlane;
+            
+            shadowDebuff += ((lightDistance - bias < closestDepth) ? 1.0 : 0.0);
+        }
+        
+       shadowDebuff /= float(samples);
+
         vec3 reflectVec = reflect(-normalize(lookAtLight), normal_Normalized);
         vec3 halfWayVec = normalize(lookAtCamera_Normalized + normalize(lookAtLight));
         specular = pow(max(dot(normal_Normalized, halfWayVec), 0.0), u_Material.shininess);
         specularLight = specular * light.color.specular * sampleColorSpecular * reflectDamping;
-        result += ((ambientLight + diffuseLight + specularLight) * attenuation);
+        result += ((ambientLight + diffuseLight * shadowDebuff + specularLight * shadowDebuff) * attenuation);
     }
     return result;
 }
@@ -243,13 +279,27 @@ void main() {
     vec3 sampleColorSpecular = texture(u_Material.specular, v_TexCoord).rgb;
     vec3 sampleColorAmbient = texture(u_Material.ambient, v_TexCoord).rgb; // TODO: 环境反射(比如天空盒)用的，现在暂时用不上
     vec3 light = vec3(0.0, 0.0, 0.0);
+    vec3 sampleNormal = texture(u_Material.normal, v_TexCoord).rgb;
+
+    vec3 T = normalize(v_T);
+    vec3 N = normalize(v_N);
+
+    T = normalize(T - dot(T,N)*N);
+
+    vec3 B = normalize(cross(N,T));
+
+    mat3 TBN = mat3(T,B,N);
+
+    sampleNormal = sampleNormal * 2 - 1;
+    sampleNormal = TBN * sampleNormal;
 
     // gamma correction
     sampleColorAmbient = pow(sampleColorAmbient, vec3(2.2));
     sampleColorDiffuse = pow(sampleColorDiffuse, vec3(2.2));
     sampleColorSpecular = pow(sampleColorSpecular, vec3(2.2));
 
-    normal_Normalized = normalize(v_Normal);
+    normal_Normalized = normalize(sampleNormal);
+    //normal_Normalized = normalize(v_Normal);
     lookAtCamera_Normalized = normalize(v_LookAtCamera);
 
     light = calcDirectionLight(sampleColorDiffuse, sampleColorDiffuse, sampleColorSpecular) + calcPointLights(sampleColorDiffuse, sampleColorDiffuse, sampleColorSpecular) + calcSpotLight(sampleColorDiffuse, sampleColorDiffuse, sampleColorSpecular);
@@ -270,7 +320,7 @@ void main() {
 
 static const int MAX_NON_DIRECTIONAL_LIGHTS = 4;
 
-void Engine::PhongLight::GenerateShadowMapInternal(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
+void Engine::PhongLight::GenerateShadowMapInternal(Renderer& renderer)
 {
     m_ShadowMap.OnCapture(renderer);
     for (auto& modelPair : m_Models)
@@ -299,10 +349,60 @@ void Engine::PhongLight::GenerateShadowMapInternal(Renderer& renderer, const glm
     m_ShadowMap.SaveDepthMap("res/screenshot/depthmap.png");
 }
 
+void Engine::PhongLight::GenerateShadowMapPointInternal(Renderer& renderer)
+{
+    for (int index = 0; index < m_PointLightIndex; index++)
+    {
+        GenerateSpecificShadowMapPointInternal(index, renderer);
+    }
+}
+
+void Engine::PhongLight::GenerateSpecificShadowMapPointInternal(int index, Renderer& renderer)
+{
+    ShadowMapPoint& shadowMapPoint = m_ShadowMapPoint[index];
+    shadowMapPoint.OnCapture(renderer);
+    for (auto& modelPair : m_Models)
+    {
+        Model* model = modelPair.second;
+        if (model != nullptr)
+        {
+            BlockModelInternal(model);
+            shadowMapPoint.CaptureModel(model->GetTransform(), *model, renderer);
+            UnblockModelInternal(model);
+        }
+    }
+        
+    for (auto& objectPair : m_Objects)
+    {
+        Object* object = objectPair.second;
+        if (object != nullptr)
+        {
+            BlockObjectInternal(object);
+            shadowMapPoint.CaptureObject(object->GetTransform(), *object, renderer);
+            UnblockObjectInternal(object);
+        }
+    }
+        
+    // std::string savePath = "res/screenshot/depthCubeMap" + std::to_string(index) + std::string{'/'};
+    shadowMapPoint.PostCapture(renderer);
+    // shadowMapPoint.SaveDepthMap(savePath);
+    
+    m_PointLightsNeedCapture[index] = false;
+    
+    GLCALL(glBindTextureUnit(1 + index, shadowMapPoint.GetShadowMap()));
+}
+
 Engine::PhongLight::PhongLight(int shadowMapResolution) : 
     m_Shader(vsShaderCode, fsShaderCode), 
-    m_ShadowMap(shadowMapResolution, false)
+    m_ShadowMap(shadowMapResolution, false),
+    m_ShadowMapResolution(shadowMapResolution)
 {
+    m_ShadowMapPoint.reserve(MAX_NON_DIRECTIONAL_LIGHTS);
+    m_PointLightsNeedCapture.reserve(MAX_NON_DIRECTIONAL_LIGHTS);
+    
+    for (int i = 0; i < MAX_NON_DIRECTIONAL_LIGHTS; i++)
+        m_PointLightsNeedCapture.emplace_back(false);
+    
     m_Shader.Use();
     
     /* 默认只开启方向光源 */
@@ -320,20 +420,25 @@ Engine::PhongLight::PhongLight(int shadowMapResolution) :
 }
 
 void Engine::PhongLight::TurnOn(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
-{   
+{
+    for (int i = 0; i < MAX_NON_DIRECTIONAL_LIGHTS; i++)
+    {
+        if (m_PointLightsNeedCapture[i])
+            GenerateSpecificShadowMapPointInternal(i, renderer);
+    }
+    
     if (!m_ShadowMapCaptured)
     {
-        GenerateShadowMapInternal(renderer, viewMatrix, projectionMatrix);
+        GenerateShadowMapInternal(renderer);
         m_ShadowMapCaptured = true;
     }
+    
     if (!m_Shader.CheckShaderValidity())
         return;
     
     uint32_t shadowMap = m_ShadowMap.GetShadowMap();
-    GLCALL(glBindTexture(GL_TEXTURE_2D, shadowMap));
-    
-    GLCALL(glBindTextureUnit(0, shadowMap));
-    m_Shader.SetUniform1i("u_ShadowDepthMap", 0);
+    GLCALL(glBindTextureUnit(5, shadowMap));
+    m_Shader.SetUniform1i("u_ShadowDepthMap", 5);
     
     m_Shader.Use();
     for (auto& modelPair : m_Models)
@@ -409,6 +514,7 @@ bool Engine::PhongLight::AddPointLight(const vec3& position, const vec3& ambient
         return false;
     
     std::string uniformName = "u_PointLights[" + std::to_string(m_PointLightIndex) + "].";
+    std::string uniformNamePointDepthMap = "u_PointLightsDepthMap[" + std::to_string(m_PointLightIndex) + "]";
     
     m_Shader.SetUniform3f(uniformName + "position", position.x, position.y, position.z);
     m_Shader.SetUniform1f(uniformName + "constant", constant);
@@ -417,7 +523,11 @@ bool Engine::PhongLight::AddPointLight(const vec3& position, const vec3& ambient
     m_Shader.SetUniform3f(uniformName + "color.ambient", ambient.x, ambient.y, ambient.z);
     m_Shader.SetUniform3f(uniformName + "color.diffuse", diffuse.x, diffuse.y, diffuse.z);
     m_Shader.SetUniform3f(uniformName + "color.specular", specular.x, specular.y, specular.z);
+    m_Shader.SetUniform1i(uniformNamePointDepthMap, m_PointLightIndex + 1);
     m_Shader.SetUniform1i("u_LightConfig.pointLightNum", ++m_PointLightIndex);
+    
+    m_ShadowMapPoint.emplace_back(m_ShadowMapResolution, false);
+    m_PointLightsNeedCapture[m_PointLightIndex - 1] = true;
     
     return true;
 }
@@ -430,6 +540,8 @@ bool Engine::PhongLight::ConfigPointLightPosition(int index, const vec3& positio
     std::string uniformName = "u_PointLights[" + std::to_string(index) + "].";
     
     m_Shader.SetUniform3f(uniformName + "position", position.x, position.y, position.z);
+    m_ShadowMapPoint[index].UpdateCapturePosition(glm::vec3{position.x, position.y, position.z});
+    m_PointLightsNeedCapture[index] = true;
     
     return true;
 }
@@ -584,6 +696,13 @@ void Engine::PhongLight::ConfigShadowMapCaptureView(glm::vec3 capturePosition, g
     
     m_Shader.SetUniformMatrix4f("u_LightSpace", lightSpace);
     m_ShadowMap.SetCaptureView(shadowMapCaptureCam, projectionMatrix);
+}
+
+void Engine::PhongLight::ConfigShadowMapPointCaptureView(int index, const glm::vec3& captureWorldPosition, float fov, float aspect, float nearPlane, float farPlane)
+{
+    m_Shader.SetUniform1f("u_FarPlane", farPlane);
+    m_ShadowMapPoint[index].SetCaptureView(captureWorldPosition, fov, aspect, nearPlane, farPlane);
+    m_PointLightsNeedCapture[index] = true;
 }
 
 void Engine::PhongLight::AddModel(const std::string& name, Model* model)

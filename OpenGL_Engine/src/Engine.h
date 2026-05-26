@@ -16,4 +16,4 @@
 #include "PhongLight.h"
 #include "SkyBox.h"
 #include "Random.h"
-#include "ShadowMap.h"
+#include "ShadowMapDirection.h"

@@ -1,4 +1,4 @@
-#include "ShadowMap.h"
+#include "ShadowMapDirection.h"
 
 /* language=GLSL */
 constexpr char vs[] = R"glsl(
@@ -26,7 +26,7 @@ void main()
 }
 )glsl";
 
-Engine::ShadowMap::ShadowMap(int resolution, bool debug) : 
+Engine::ShadowMapDirection::ShadowMapDirection(int resolution, bool debug) : 
     m_RenderTarget(resolution, resolution), 
     m_Shader(vs, fs), 
     m_Resolution(resolution),
@@ -39,28 +39,27 @@ Engine::ShadowMap::ShadowMap(int resolution, bool debug) :
     }
     else
     {
-        m_RenderTarget.BindFramebuffer();
         m_RenderTarget.SetDepthUseOnly();
         m_RenderTarget.CreateDepthAttachment();  
     }
 }
 
 
-void Engine::ShadowMap::OnCapture(const Renderer& renderer) const
+void Engine::ShadowMapDirection::OnCapture(const Renderer& renderer) const
 {
     m_RenderTarget.BindFramebuffer();
     GLCALL(glViewport(0, 0, m_Resolution, m_Resolution));
     renderer.OnRender();
 }
 
-void Engine::ShadowMap::CaptureModel(const glm::mat4& modelMatrix, Model& model, Engine::Renderer& renderer)
+void Engine::ShadowMapDirection::CaptureModel(const glm::mat4& modelMatrix, Model& model, Engine::Renderer& renderer)
 {
     m_Shader.Use();
     m_Shader.SetUniformMatrix4f("u_Model", modelMatrix);
     model.Draw(renderer);
 }
 
-void Engine::ShadowMap::CaptureObject(const glm::mat4& modelMatrix, Object& object, const Renderer& renderer)
+void Engine::ShadowMapDirection::CaptureObject(const glm::mat4& modelMatrix, Object& object, const Renderer& renderer)
 {
     m_Shader.Use();
     m_Shader.SetUniformMatrix4f("u_Model", modelMatrix);
@@ -68,7 +67,7 @@ void Engine::ShadowMap::CaptureObject(const glm::mat4& modelMatrix, Object& obje
     renderer.DrawElements(object.GetIndexCount(), nullptr);
 }
 
-void Engine::ShadowMap::PostCapture(Renderer& renderer) const
+void Engine::ShadowMapDirection::PostCapture(Renderer& renderer) const
 {
     m_RenderTarget.UnbindFramebuffer();
     m_Shader.UnUse();
@@ -80,7 +79,7 @@ void Engine::ShadowMap::PostCapture(Renderer& renderer) const
     GLCALL(glViewport(viewPortX, viewPortY, width, height));
 }
 
-void Engine::ShadowMap::SetCaptureView(const Camera& captureCamera, const glm::mat4& projectionMatrix)
+void Engine::ShadowMapDirection::SetCaptureView(const Camera& captureCamera, const glm::mat4& projectionMatrix)
 {
     glm::mat4 captureView = captureCamera.GetViewMatrix();
     glm::mat4 captureSpace = projectionMatrix * captureView;
@@ -89,7 +88,7 @@ void Engine::ShadowMap::SetCaptureView(const Camera& captureCamera, const glm::m
     m_Shader.UnUse();
 }
 
-void Engine::ShadowMap::SaveDepthMap(const std::string& path) const
+void Engine::ShadowMapDirection::SaveDepthMap(const std::string& path) const
 {
     if (m_Debug)
     {

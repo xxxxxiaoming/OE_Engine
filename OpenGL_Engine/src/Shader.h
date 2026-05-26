@@ -35,6 +35,7 @@ namespace Engine
         
         void SetUniform1iv(const std::string& name, int count, const int* value);
         void SetUniform1fv(const std::string& name, int count, const float* value);
+        void SetUniformMatrix4fv(const std::string& name, int count, const glm::mat4* value);
         
         int GetUniformLocation(const std::string& name = std::string{""}) const;
     };

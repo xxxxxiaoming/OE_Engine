@@ -36,6 +36,7 @@ namespace Engine
 		std::vector<Texture> m_TexturesAmbient;
 		std::vector<Texture> m_TexturesDiffuse;
 		std::vector<Texture> m_TextureSpecular;
+		std::vector<Texture> m_TextureNormal;
 		
 		Object(const Vertex* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t indexCount, std::string& assetDirectory, const Transform& transform = Transform{});
 		~Object();
@@ -44,18 +45,18 @@ namespace Engine
 		 
 		void Destroy();
 
-		inline void EnableLight() { m_EnableLight = true; }
-		inline void DisableLight() { m_EnableLight = false; }
+		void EnableLight() { m_EnableLight = true; }
+		void DisableLight() { m_EnableLight = false; }
 
-		inline VertexArrayBuffer& GetVAO() { return m_VAO; }
-		inline VertexBuffer& GetVBO() { return m_VBO; }
-		inline IndexBuffer& GetIBO()  { return m_IBO; }
-		inline uint32_t GetIndexCount() const { return m_IndexCount; }
-		inline uint32_t GetVertexCount() const { return m_VertexCount; }
-		inline glm::mat4 GetTransform() const { return m_Transform; }
-		inline glm::mat3 GetNormalMatrix() const { return m_NormalMatrix; }
+		VertexArrayBuffer& GetVAO() { return m_VAO; }
+		VertexBuffer& GetVBO() { return m_VBO; }
+		IndexBuffer& GetIBO()  { return m_IBO; }
+		uint32_t GetIndexCount() const { return m_IndexCount; }
+		uint32_t GetVertexCount() const { return m_VertexCount; }
+		glm::mat4 GetTransform() const { return m_Transform; }
+		glm::mat3 GetNormalMatrix() const { return m_NormalMatrix; }
 		
-		inline void SetTransform(const Transform& transform)
+		void SetTransform(const Transform& transform)
 		{
 			m_Transform = GenerateModelMatrix(transform);
 			m_NormalMatrix = glm::transpose(glm::inverse(glm::mat3(m_Transform)));

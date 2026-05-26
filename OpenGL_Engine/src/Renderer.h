@@ -43,7 +43,7 @@ namespace  Engine
         void DrawElementsInstanced(int count, const unsigned int* indices, uint32_t amount, uint32_t mode = GL_TRIANGLES) const;
         void OnRender() const;
         void Render() const;
-        inline void Clear() const {glfwTerminate();}
+        void Clear() const {glfwTerminate();}
         
         /* 加入到 dataBufferArray 的 data buffer 在运行结束时无需手动 delete buffer */
         // void AddDataBuffer(const unsigned int bufferID);

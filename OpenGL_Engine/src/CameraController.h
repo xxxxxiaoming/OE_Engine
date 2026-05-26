@@ -25,8 +25,8 @@ namespace Engine
 		void BindKey(const Operations op, int key);
 		void UnBindKey(const Operations op);
 
-		inline void SetMoveSpeed(float moveSpeed) { m_MoveSpeed = moveSpeed; }
-		inline void SetRotateSpeed(float rotateSpeed) { m_RotateSpeed = rotateSpeed; }
+		void SetMoveSpeed(float moveSpeed) { m_MoveSpeed = moveSpeed; }
+		void SetRotateSpeed(float rotateSpeed) { m_RotateSpeed = rotateSpeed; }
 
 		void PossessCamera(Camera* camera);
 		void UnPossesCamera();

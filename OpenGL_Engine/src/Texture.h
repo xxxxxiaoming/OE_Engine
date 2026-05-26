@@ -36,10 +36,10 @@ namespace Engine
         void Bind(int slot);
         void UnBind() const;
         
-		inline bool CheckTextureValidity() const { return m_GLTextureID != 0; }
+		 bool CheckTextureValidity() const { return m_GLTextureID != 0; }
 
-		inline int GetTextureSlot() const { return m_Slot; }
-        inline int GetWidth() const { return m_Width; }
-        inline int GetHeight() const { return m_Height; }
+		 int GetTextureSlot() const { return m_Slot; }
+         int GetWidth() const { return m_Width; }
+         int GetHeight() const { return m_Height; }
     };
 }

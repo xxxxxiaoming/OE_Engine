@@ -47,6 +47,8 @@ Engine::Renderer::Renderer(int width, int height, const char* title)
     m_ViewportWidth = width;
     m_ViewportHeight = height;
     GLCALL(glViewport(0, 0, width, height));
+    
+    GLCALL(glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS));
 }
 
 // Engine::Renderer::~Renderer()

@@ -20,6 +20,7 @@ namespace Engine
 		LookLeft,
 		LookRight,
 	};
+	
 	enum class TextureType
 	{
 		DIFFUSE, SPECULAR, NORMAL, NONE
@@ -46,6 +47,9 @@ namespace Engine
         vec2 texCoord;
         vec4 color;
         float textureSlot;
+    	
+    	vec3 tangent;
+    	vec3 bitangent;
     };
 	
 	struct Transform
@@ -76,24 +80,32 @@ namespace Engine
 			vertexLeftBottom.texCoord = { 0.0f, 0.0f };
 			vertexLeftBottom.color = { 1.0f, 1.0f, 0.0f, 1.0f };
 			vertexLeftBottom.textureSlot = 0.0f;
+			vertexLeftBottom.tangent = { 1.0f, 0.0f, 0.0f };
+			vertexLeftBottom.bitangent = { 0.0f, 1.0f, 0.0f };
 
 			vertexRightBottom.pos = { position.x + w, position.y, position.z };
 			vertexRightBottom.normal = { 0.0f, 0.0f, 1.0f };
 			vertexRightBottom.texCoord = { 1.0f, 0.0f };
 			vertexRightBottom.color = { 1.0f, 1.0f, 0.0f, 1.0f };
 			vertexRightBottom.textureSlot = 0.0f;
+			vertexRightBottom.tangent = { 1.0f, 0.0f, 0.0f };
+			vertexRightBottom.bitangent = { 0.0f, 1.0f, 0.0f };
 
 			vertexRightTop.pos = { position.x + w, position.y + h, position.z };
 			vertexRightTop.normal = { 0.0f, 0.0f, 1.0f };
 			vertexRightTop.texCoord = { 1.0f, 1.0f };
 			vertexRightTop.color = { 1.0f, 1.0f, 0.0f, 1.0f };
 			vertexRightTop.textureSlot = 0.0f;
+			vertexRightTop.tangent = { 1.0f, 0.0f, 0.0f };
+			vertexRightTop.bitangent = { 0.0f, 1.0f, 0.0f };
 
 			vertexLeftTop.pos = { position.x, position.y + h, position.z };
 			vertexLeftTop.normal = { 0.0f, 0.0f, 1.0f };
 			vertexLeftTop.texCoord = { 0.0f, 1.0f };
 			vertexLeftTop.color = { 1.0f, 1.0f, 0.0f, 1.0f };
 			vertexLeftTop.textureSlot = 0.0f;
+			vertexLeftTop.tangent = { 1.0f, 0.0f, 0.0f };
+			vertexLeftTop.bitangent = { 0.0f, 1.0f, 0.0f };
 		}
 
 		for (int count = 0; count < SIZE; count++)

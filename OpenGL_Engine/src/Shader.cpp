@@ -2,6 +2,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstdio>
+#include <glm/gtc/type_ptr.hpp>
 
 #include "Shader.h"
 #include "Helper.h"
@@ -430,6 +431,25 @@ void Engine::Shader::SetUniform1fv(const std::string& name, int count, const flo
         {
             m_UniformLocations[name] = loc;
             GLCALL(glProgramUniform1fv(m_ShaderID, loc, count, value));
+        }
+    }
+}
+
+void Engine::Shader::SetUniformMatrix4fv(const std::string& name, int count, const glm::mat4* value)
+{
+    if (m_UniformLocations.find(name) != m_UniformLocations.end())
+    {
+        int loc = m_UniformLocations[name];
+        GLCALL(glProgramUniformMatrix4fv(m_ShaderID, loc, count, GL_FALSE, glm::value_ptr(value[0][0])));
+    }
+    else
+    {
+        int loc = GetUniformLocation(name);
+        
+        if (loc != -1)
+        {
+            m_UniformLocations[name] = loc;
+            GLCALL(glProgramUniformMatrix4fv(m_ShaderID, loc, count, GL_FALSE, glm::value_ptr(value[0])));
         }
     }
 }
