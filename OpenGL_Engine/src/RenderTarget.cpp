@@ -13,8 +13,8 @@ const std::string pngName[6] = {
 	"front.png"
 };
 
-Engine::RenderTarget::RenderTarget(int width, int height) :
-	m_Width(width), m_Height(height)
+Engine::RenderTarget::RenderTarget(int width, int height, bool bEnableHDR) :
+	m_Width(width), m_Height(height) , m_bEnableHDR(bEnableHDR)
 {
 	GLCALL(glGenFramebuffers(1, &m_FBO));
 }
@@ -82,7 +82,10 @@ void Engine::RenderTarget::CreateColorAttachment()
 	GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
 	GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
 	
-	GLCALL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, m_Width, m_Height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr));
+	uint16_t innerFormat = m_bEnableHDR ? GL_RGB16F : GL_RGBA;
+	uint16_t dataType = m_bEnableHDR ? GL_FLOAT : GL_UNSIGNED_BYTE;
+	
+	GLCALL(glTexImage2D(GL_TEXTURE_2D, 0, innerFormat, m_Width, m_Height, 0, GL_RGB, dataType, nullptr));
 	GLCALL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_ColorAttachment, 0));
 	GLCALL(glBindTexture(GL_TEXTURE_2D, 0));
 	

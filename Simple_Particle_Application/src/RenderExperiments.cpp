@@ -4,6 +4,19 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+float exposure = 1.5f;
+static void ProcessInput(Engine::Renderer& renderer, float deltaTime)
+{
+	if (glfwGetKey(const_cast<GLFWwindow*>(renderer.GetGLFWwinow()), GLFW_KEY_1) == GLFW_PRESS)
+	{
+		exposure = exposure + 0.1f;
+	}
+	else if (glfwGetKey(const_cast<GLFWwindow*>(renderer.GetGLFWwinow()), GLFW_KEY_2) == GLFW_PRESS)
+	{
+		exposure = exposure - 0.1f > 0.0f ? exposure - 0.1f : exposure;
+	}
+}
+
 static void BindKeys(Engine::CameraController& camController)
 {
 	camController.BindKey(Engine::Operations::MoveUp, GLFW_KEY_Q);
@@ -25,15 +38,15 @@ static void ConfigPhongLight(Engine::PhongLight& phongLight, const Engine::vec3&
 	phongLight.ConfigDirectionLight(
 		Engine::vec3{-1.0f, -1.0f, -1.0f},
 		Engine::vec3{0.02f,0.02f,0.02f},
-		Engine::vec3{0.7f,0.7f,0.7f},
+		Engine::vec3{7.7f,7.7f,7.7f},
 		Engine::vec3{0.01f,0.01f,0.01f}
 		);
 	
 	phongLight.AddPointLight(
 		pointLightWorldPosition, 
-		Engine::vec3{0.01f, 0.01f, 0.01f}, 
-		Engine::vec3{1.0f,1.0f,1.0f},
-		Engine::vec3{0.5f, 0.5f, 0.5f},
+		Engine::vec3{0.1f, 0.1f, 0.1f}, 
+		Engine::vec3{17.17f,17.17f,17.77f},
+		Engine::vec3{5.5f, 5.5f, 5.5f},
 		1.0f, 0.001f, 0.0001f
 		);															// 使用1个点光源
 	
@@ -72,7 +85,33 @@ void AdvancedLighting(Engine::Renderer& renderer)
 	glm::vec3 camPostion = glm::vec3(0.0f, 200.0f, 0.0f);
 	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 0.0f, -100.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
 	Engine::CameraController camController{ renderer.GetGLFWwinow(), 100.0f, 40.0f };
-
+	
+	/* HDR render target */
+	bool bHDR = true;
+	Engine::RenderTarget renderTargetHDR{1280, 720, true};
+	renderTargetHDR.CreateColorAttachment();
+	renderTargetHDR.CreateRenderBuffer();
+	
+	Engine::vec3 rectPos[1] = { Engine::vec3{-1.0f, -1.0f, 0.0f} };
+	Engine::Vertex vertices[4];
+	uint32_t indices[6];
+	float widthHDRRect[1] = { 2.0f };
+	float heightHDRRect[1] = { 2.0f };
+	std::string assetDirector{ "res/texture" };
+	
+	Engine::createRectangle(rectPos, widthHDRRect, heightHDRRect, vertices, indices);
+	Engine::Object rectObj{ vertices, indices, 4, 6, assetDirector };
+	
+	rectObj.DisableLight();
+	
+	std::string vsShaderPathRect = "res/shader/FBVSShader.vert";
+	std::string fsShaderPathRect = "res/shader/FSHDR.frag";
+	Engine::Shader shaderRect{ vsShaderPathRect, fsShaderPathRect };
+	Engine::Material matForRect;
+	matForRect.BindShader(&shaderRect);
+	shaderRect.SetUniform1f("u_Exposure", exposure);
+	shaderRect.SetUniform1i("u_HDR", bHDR);
+	
 	/* Bind keys */
 	BindKeys(camController);
 
@@ -81,14 +120,14 @@ void AdvancedLighting(Engine::Renderer& renderer)
 	
 	/* Phong Light */
 	Engine::PhongLight phongLight;
-	Engine::vec3 pointLightPosition{-70.0f, 70.0f, -70.0f};
+	Engine::vec3 pointLightPosition{-70.0f, 70.0f, -50.0f};
 	ConfigPhongLight(phongLight, pointLightPosition, cam);
 	
 	/* Shadow Map */
 	glm::vec3 shadowMapCamLookAt = glm::vec3(0.0f, 0.0f, -70.0f); // 精准瞄准 Nanosuit
 	glm::vec3 shadowMapCaptureCamPos = shadowMapCamLookAt + glm::vec3(150.0f, 150.0f, 150.0f); // 把光源相机拉近
 	
-	// phongLight.DisableDirectionLight();
+	phongLight.DisableDirectionLight();
 
 	// 将投影矩阵的宽高大幅度缩小到 300x300，让 1024 贴图的像素密度暴增！
 	phongLight.ConfigShadowMapCaptureView(
@@ -163,7 +202,8 @@ void AdvancedLighting(Engine::Renderer& renderer)
 		glm::vec3(0.0f, 30.0f, -70.0f),
 		glm::vec3(0.0f, 0.0f, 0.0f),
 	};
-	Engine::Model nanoSuit{"res/assets/backpack/backpack.obj", true, nanosuitTransform};
+	Engine::Model nanoSuit{"res/assets/backpack/backpack.obj", true
+		, nanosuitTransform};
 	
 	int nanosuitAmbientSlot[1] = {4};
 	int nanoSuitDiffuseSlot[1] = {5};
@@ -185,8 +225,8 @@ void AdvancedLighting(Engine::Renderer& renderer)
 		double deltaTime = thisFrameTime - lastFrameTime;
 		lastFrameTime = thisFrameTime;
 		
-		
 		camController.ProcessInput(static_cast<float>(deltaTime));
+		ProcessInput(renderer, deltaTime);
 		
 		glm::mat4 viewMat = cam.GetViewMatrix();
 		glm::vec3 camPosRealTime = cam.GetPosition();
@@ -199,14 +239,41 @@ void AdvancedLighting(Engine::Renderer& renderer)
 		phongLight.ConfigSpotLightPosition(0, Engine::vec3{camPosRealTime.x, camPosRealTime.y, camPosRealTime.z});
 		phongLight.ConfigSpotLightDirection(0, Engine::vec3{camFrontRealTime.x, camFrontRealTime.y, camFrontRealTime.z});
 		
-		renderer.OnRender();
+		if (bHDR)
+		{
+			renderTargetHDR.BindFramebuffer();
 		
-		/* Draw Scene */
-		phongLight.TurnOn(renderer, viewMat, projectionMatrix);
-		phongLight.TurnOff(renderer);
+			renderer.OnRender();
 		
+			/* Draw Scene */
+			phongLight.TurnOn(renderer, viewMat, projectionMatrix);
+			phongLight.TurnOff(renderer);
 		
-		renderer.Render();
+			renderTargetHDR.UnbindFramebuffer();
+		
+			renderer.OnRender();
+		
+			matForRect.UseMaterial();
+			uint32_t texture = renderTargetHDR.GetTextureBuffer();
+			glBindTextureUnit(0, texture);
+		
+			shaderRect.SetUniform1f("u_Exposure", exposure);
+			rectObj.OnDraw();
+			renderer.DrawElements(rectObj.GetIndexCount(), nullptr);
+		
+			renderer.Render();
+		}
+		else
+		{
+			renderer.OnRender();
+		
+			/* Draw Scene */
+			phongLight.TurnOn(renderer, viewMat, projectionMatrix);
+			phongLight.TurnOff(renderer);
+		
+			renderer.Render();
+		}
+		
 	}
 }
 

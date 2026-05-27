@@ -11,14 +11,17 @@ namespace Engine
 	private:
 		int m_Width;
 		int m_Height;
+		
 		uint32_t m_FBO = 0;
 		uint32_t m_ColorAttachment = 0;
 		uint32_t m_DepthAttachment = 0;
 		uint32_t m_DepthCubeAttachment = 0;
 		uint32_t m_DepthStencilAttachment = 0;
 		uint32_t m_RenderBuffer = 0;
+		
+		bool m_bEnableHDR = false;
 	public:
-		RenderTarget(int width, int height);
+		RenderTarget(int width, int height, bool bEnableHDR = false);
 		~RenderTarget();
 
 		void CreateColorAttachment();
@@ -45,6 +48,8 @@ namespace Engine
 		uint32_t GetTextureBuffer() const {return m_ColorAttachment;}
 		uint32_t GetDepthBuffer() const {return m_DepthAttachment;}
 		uint32_t GetCubeDepthBuffer() const {return m_DepthCubeAttachment;}
+		
+		bool CheckEnableHDR() const {return m_bEnableHDR;}
 		
 		bool CheckFramebufferStatus() const { return m_FBO != 0 && glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;  }
 	};

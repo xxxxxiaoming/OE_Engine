@@ -58,7 +58,7 @@ Engine::Texture::Texture(const std::string& fileName, bool bFlipVertical) : m_Fi
         innerFormat = GL_RGB8;
         format = GL_RGB;
     }
-    else if (m_BPP = 4)
+    else if (m_BPP == 4)
     {
         innerFormat = GL_RGBA8;
         format = GL_RGBA;

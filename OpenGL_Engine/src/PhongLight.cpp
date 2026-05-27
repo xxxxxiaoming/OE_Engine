@@ -274,6 +274,23 @@ vec3 calcSpotLight(vec3 sampleColorAmbient, vec3 sampleColorDiffuse, vec3 sample
      return result;
 }
 
+mat3 correctionTBN(vec3 v_T, vec3 v_B, vec3 v_N)
+{
+    vec3 T = normalize(v_T);
+    vec3 B = normalize(v_B);
+    vec3 N = normalize(v_N);
+
+    T = normalize(T - dot(T,N)*N);
+
+    float handedness = sign(dot(cross(N, T), B));
+    B = cross(N, T) * handedness;
+
+    mat3 TBN = mat3(T,B,N);
+
+    return TBN;
+}
+
+
 void main() {
     vec3 sampleColorDiffuse = texture(u_Material.diffuse, v_TexCoord).rgb;
     vec3 sampleColorSpecular = texture(u_Material.specular, v_TexCoord).rgb;
@@ -281,22 +298,16 @@ void main() {
     vec3 light = vec3(0.0, 0.0, 0.0);
     vec3 sampleNormal = texture(u_Material.normal, v_TexCoord).rgb;
 
-    vec3 T = normalize(v_T);
-    vec3 N = normalize(v_N);
-
-    T = normalize(T - dot(T,N)*N);
-
-    vec3 B = normalize(cross(N,T));
-
-    mat3 TBN = mat3(T,B,N);
-
-    sampleNormal = sampleNormal * 2 - 1;
-    sampleNormal = TBN * sampleNormal;
-
     // gamma correction
     sampleColorAmbient = pow(sampleColorAmbient, vec3(2.2));
     sampleColorDiffuse = pow(sampleColorDiffuse, vec3(2.2));
     sampleColorSpecular = pow(sampleColorSpecular, vec3(2.2));
+    //sampleNormal = pow(sampleNormal, vec3(2.2));
+
+    mat3 TBN = correctionTBN(v_T, v_B, v_N);
+
+    sampleNormal = sampleNormal * 2 - 1;
+    sampleNormal = TBN * sampleNormal;
 
     normal_Normalized = normalize(sampleNormal);
     //normal_Normalized = normalize(v_Normal);
@@ -307,7 +318,7 @@ void main() {
     color = vec4(light, texture(u_Material.diffuse, v_TexCoord).a);
 
     // gamma correction
-    color = vec4(pow(color.rgb, vec3(1.0/2.2)), color.a);
+    //color = vec4(pow(color.rgb, vec3(1.0/2.2)), color.a);
 
     /* 注意，这里是将纹理上，对应坐标的颜色RGB完完整整取出来，不会管Alpha通道的值的，就算Alpha是0，也会被完整取出来，写入到frame buffer中 */
     /* 所以要么在OpenGL开启Blend，要么在这里，自行过滤： */
