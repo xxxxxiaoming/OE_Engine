@@ -3,11 +3,70 @@
 
 #include <assimp/postprocess.h>
 #include <assimp/vector3.h>
+#include <mikktspace.h>
 
 #include <cstdlib>
 
 #include "Material.h"
 #include "Type.h"
+
+// 定义一个临时结构体，把你的网格数据传进去
+struct MikkMeshData
+{
+	Engine::Vertex* vertices;
+	uint32_t*       indices;
+	size_t          indexCount;
+	uint8_t         indicesOfOneFace;
+};
+
+void CalcMikkTSpaceTangents(Engine::Vertex* vertices, uint32_t* indices, uint8_t indicesPerFace, size_t indexCount)
+{
+
+    MikkMeshData meshData{ vertices, indices, indexCount, indicesPerFace };
+
+    SMikkTSpaceInterface iface{};
+
+    iface.m_getNumFaces = [](const SMikkTSpaceContext* ctx) -> int {
+        auto* data = static_cast<MikkMeshData*>(ctx->m_pUserData);
+        return (int)data->indexCount / data->indicesOfOneFace;
+    };
+
+    iface.m_getNumVerticesOfFace = [](const SMikkTSpaceContext* ctx, const int) -> int {
+    	auto* data = static_cast<MikkMeshData*>(ctx->m_pUserData);
+        return data->indicesOfOneFace;
+    };
+
+    iface.m_getPosition = [](const SMikkTSpaceContext* ctx, float out[], const int iFace, const int iVert) {
+        auto* data = static_cast<MikkMeshData*>(ctx->m_pUserData);
+        const auto& pos = data->vertices[data->indices[iFace * data->indicesOfOneFace + iVert]].pos;
+        out[0] = pos.x; out[1] = pos.y; out[2] = pos.z;
+    };
+
+    iface.m_getNormal = [](const SMikkTSpaceContext* ctx, float out[], const int iFace, const int iVert) {
+        auto* data = static_cast<MikkMeshData*>(ctx->m_pUserData);
+        const auto& n = data->vertices[data->indices[iFace * data->indicesOfOneFace + iVert]].normal;
+        out[0] = n.x; out[1] = n.y; out[2] = n.z;
+    };
+
+    iface.m_getTexCoord = [](const SMikkTSpaceContext* ctx, float out[], const int iFace, const int iVert) {
+        auto* data = static_cast<MikkMeshData*>(ctx->m_pUserData);
+        const auto& uv = data->vertices[data->indices[iFace * data->indicesOfOneFace + iVert]].texCoord;
+        out[0] = uv.x; out[1] = uv.y;
+    };
+
+    iface.m_setTSpaceBasic = [](const SMikkTSpaceContext* ctx, const float tangent[], const float fSign, const int iFace, const int iVert) {
+        auto* data = static_cast<MikkMeshData*>(ctx->m_pUserData);
+        auto& vert = data->vertices[data->indices[iFace * data->indicesOfOneFace + iVert]];
+        vert.tangent   = Engine::vec3{tangent[0], tangent[1], tangent[2]};
+        vert.bitangent = Engine::vec3{fSign, 0.0f, 0.0f};
+    };
+
+    SMikkTSpaceContext ctx{};
+    ctx.m_pInterface = &iface;
+    ctx.m_pUserData  = &meshData;
+
+    genTangSpaceDefault(&ctx);
+}
 
 static Engine::BlendMode ProcessMeshBlendMode(const aiMaterial* material)
 {
@@ -87,7 +146,8 @@ void Engine::Part::ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& 
 			vertices[count].color = vec4{ aiVertexColor.r, aiVertexColor.g, aiVertexColor.b, aiVertexColor.a };
 		}
 		
-		if (mesh->HasTangentsAndBitangents())
+		if (indicesPerFace < 3 && mesh->HasTangentsAndBitangents())
+		// if (mesh->HasTangentsAndBitangents())
 		{
 			aiVector3D aiTangent = mesh->mTangents[count];
 			aiVector3D aiBitangent = mesh->mBitangents[count];
@@ -107,6 +167,11 @@ void Engine::Part::ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& 
 		for(int index = 0; index < indicesPerFace; index ++)
 			indices[count * indicesPerFace + index] = face.mIndices[index];
 	}
+	
+	// if (false)
+	if (indicesPerFace >= 3)
+		// Attention pls! MikkTSpace 只支持计算三角形/四边形片元的切线空间
+		CalcMikkTSpaceTangents(vertices, indices, indicesPerFace, mesh->mNumFaces * indicesPerFace);
 	
 	objects.emplace_back(vertices, indices, mesh->mNumVertices, mesh->mNumFaces * indicesPerFace, assetDirectory);
 
@@ -246,7 +311,7 @@ Engine::Model::Model(const std::string& path, bool bFlipUV, const Transform& tra
 {
 	printf("Loading ...\n");
 	Assimp::Importer importer;
-	uint32_t importFlags = aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace;
+	uint32_t importFlags = aiProcess_Triangulate | aiProcess_GenSmoothNormals;
 	
 	if (bFlipUV)
 		importFlags |= aiProcess_FlipUVs;

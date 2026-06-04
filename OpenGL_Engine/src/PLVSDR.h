@@ -31,7 +31,7 @@ void main() {
 	mat3 model3 = mat3(u_Model);
 
 	v_T = model3 * tangent;
-	v_B = model3 * bitangent;
+	v_B = bitangent;	// bitangent 直接透传，因为这个向量会在 fragment shader 中用v_T,v_N重建(correctionTBN)
 	v_N = u_NormalMat * normal;
 
 	v_TexCoord = texCoord;

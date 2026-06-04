@@ -43,18 +43,8 @@ void Engine::PhongLight::UnblockObjectInternal(Object* object)
 void Engine::PhongLight::GenerateShadowMapInternal(Renderer& renderer)
 {
     m_ShadowMap.OnCapture(renderer);
-    for (auto& modelPair : m_Models)
-    {
-        Model* model = modelPair.second;
-        if (model != nullptr)
-        {
-            BlockModelInternal(model);
-            m_ShadowMap.CaptureModel(model->GetTransform(), *model, renderer);
-            UnblockModelInternal(model);
-        }
-    }
-        
-    for (auto& objectPair : m_Objects)
+    
+    for (auto& objectPair : m_OpaqueObjects)
     {
         Object* object = objectPair.second;
         if (object != nullptr)
@@ -81,18 +71,8 @@ void Engine::PhongLight::GenerateSpecificShadowMapPointInternal(int index, Rende
 {
     ShadowMapPoint& shadowMapPoint = m_ShadowMapPoint[index];
     shadowMapPoint.OnCapture(renderer);
-    for (auto& modelPair : m_Models)
-    {
-        Model* model = modelPair.second;
-        if (model != nullptr)
-        {
-            BlockModelInternal(model);
-            shadowMapPoint.CaptureModel(model->GetTransform(), *model, renderer);
-            UnblockModelInternal(model);
-        }
-    }
         
-    for (auto& objectPair : m_Objects)
+    for (auto& objectPair : m_OpaqueObjects)
     {
         Object* object = objectPair.second;
         if (object != nullptr)
@@ -383,7 +363,7 @@ bool Engine::PhongLight::AddPointLight(const vec3& position, const vec3& ambient
     m_ShaderLightForward.SetUniform3f(uniformName + "color.ambient", ambient.x, ambient.y, ambient.z);
     m_ShaderLightForward.SetUniform3f(uniformName + "color.diffuse", diffuse.x, diffuse.y, diffuse.z);
     m_ShaderLightForward.SetUniform3f(uniformName + "color.specular", specular.x, specular.y, specular.z);
-    m_ShaderLightForward.SetUniform1i("u_LightConfig.pointLightNum", ++m_PointLightIndex);
+    m_ShaderLightForward.SetUniform1i("u_LightConfig.pointLightNum", m_PointLightIndex);
     
     m_ShadowMapPoint.emplace_back(m_ShadowMapResolution, false);
     m_PointLightsNeedCapture[m_PointLightIndex - 1] = true;

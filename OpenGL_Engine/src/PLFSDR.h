@@ -34,7 +34,8 @@ mat3 correctionTBN(vec3 v_T, vec3 v_B, vec3 v_N)
 
     T = normalize(T - dot(T,N)*N);
 
-    float handedness = sign(dot(cross(N, T), B));
+    float handedness = v_B.x;
+    //float handedness = sign(dot(cross(N, T), B));
     B = cross(N, T) * handedness;
 
     mat3 TBN = mat3(T,B,N);

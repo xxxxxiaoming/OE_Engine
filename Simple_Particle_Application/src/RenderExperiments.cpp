@@ -46,8 +46,8 @@ static void ConfigPhongLight(Engine::PhongLight& phongLight, const Engine::vec3&
 	
 	// phongLight.AddPointLight(
 	// 	pointLightWorldPosition, 
-	// 	Engine::vec3{0.1f, 0.1f, 0.1f}, 
-	// 	Engine::vec3{1.7f,1.7f,1.7f},
+	// 	Engine::vec3{0.01f, 0.01f, 0.01f}, 
+	// 	Engine::vec3{2.0f,1.7f,1.7f},
 	// 	Engine::vec3{0.1f, 0.1f, 0.1f},
 	// 	1.0f, 0.001f, 0.0001f
 	// 	);															// 使用2个点光源
@@ -130,7 +130,7 @@ void AdvancedLighting(Engine::Renderer& renderer)
 	
 	/* Phong Light */
 	Engine::PhongLight phongLight{1024, true};
-	Engine::vec3 pointLightPosition{-70.0f, 70.0f, -50.0f};
+	Engine::vec3 pointLightPosition{-10.0f, 70.0f, -50.0f};
 	ConfigPhongLight(phongLight, pointLightPosition, cam);
 	
 	/* Shadow Map */
@@ -210,7 +210,7 @@ void AdvancedLighting(Engine::Renderer& renderer)
 	
 	Engine::Transform nanosuitTransform = {
 		glm::vec3(10.0f, 10.0f, 10.0f),
-		glm::vec3(0.0f, 20.0f, -70.0f),
+		glm::vec3(0.0f, 17.0f, -70.0f),
 		glm::vec3(0.0f, 0.0f, 0.0f),
 	};
 	Engine::Model nanoSuit{"res/assets/backpack/backpack.obj", true
