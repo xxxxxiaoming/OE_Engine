@@ -92,10 +92,15 @@ void Engine::PhongLight::GenerateSpecificShadowMapPointInternal(int index, Rende
     GLCALL(glBindTextureUnit(1 + index, shadowMapPoint.GetShadowMap()));
 }
 
+/*
+ * @brief 管线中的前向渲染部分，只渲染透明物体，所有透明物体都会被放到这个流程中渲染
+ */
 void Engine::PhongLight::ForwardRenderInternal(const Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
 {
     m_RTLight.BindFramebuffer();
     m_ShaderLightForward.Use();
+    
+    renderer.EnableBlend();
         
     for (auto& objectPair : m_TransparentObjects)
     {
@@ -105,12 +110,13 @@ void Engine::PhongLight::ForwardRenderInternal(const Renderer& renderer, const g
             ConfigMVPMatrix(object->GetTransform(), viewMatrix, projectionMatrix);
             ConfigNormalMatrix(object->GetNormalMatrix());
 
-            renderer.EnableBlend();
+
             object->OnDraw();
             renderer.DrawElements(object->GetIndexCount(), nullptr);
-            renderer.DisableBlend();
         }
     }
+    
+    renderer.DisableBlend();
     
     m_ShaderLightForward.UnUse();
     m_RTLight.UnbindFramebuffer();

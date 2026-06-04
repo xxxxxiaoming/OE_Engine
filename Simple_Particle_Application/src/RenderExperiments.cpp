@@ -208,6 +208,51 @@ void AdvancedLighting(Engine::Renderer& renderer)
 	
 	phongLight.AddObject("floor", &floor);
 	
+	constexpr float sizeXGlass = 100.0f;
+	constexpr float sizeYGlass = 100.0f;
+	Engine::Vertex glassVertices[4];
+	Engine::vec3 glassPositions[1] = {
+		Engine::vec3{-sizeXGlass / 2.0f, -sizeYGlass / 2.0f, 0.0f}
+	};
+	
+	float glassWidth[1] = {
+		sizeXGlass
+	};
+	float glassHeight[1] = {
+		sizeYGlass
+	};
+	
+	uint32_t glassIndices[6];
+	
+	Engine::createRectangle(glassPositions, glassWidth, glassHeight, glassVertices, glassIndices);
+	
+	Engine::Transform glassTransform = {
+		glm::vec3(1.0f, 1.0f, 1.0f),
+		glm::vec3(0.0f, 50.0f, -30.0f),
+		glm::vec3(0.0f, 0.0f, 0.0f)
+	};
+	Engine::Object glass{glassVertices, glassIndices, 4, 6, assetPath, glassTransform};
+	
+	glass.m_TexturesAmbient.reserve(1);
+	glass.m_TexturesDiffuse.reserve(1);
+	glass.m_TextureSpecular.reserve(1);
+	glass.m_TexturesAmbient.emplace_back("res/texture/blending_transparent_window.png");
+	glass.m_TexturesDiffuse.emplace_back("res/texture/blending_transparent_window.png");
+	glass.m_TextureSpecular.emplace_back(0xFF000000);
+	glass.m_TextureNormal.emplace_back(0xFFFF8080);
+	
+	int glassDiffuseSlot[1] = {8};
+	int glassSpecularSlot[1] = {9};
+	int glassNormalSlot[1] = {10};
+	glass.m_Material.BindAmbientSlots(glassDiffuseSlot, 1);
+	glass.m_Material.BindDiffuseSlots(glassDiffuseSlot, 1);
+	glass.m_Material.BindSpecularSlots(glassSpecularSlot, 1);
+	glass.m_Material.BindNormalSlots(glassNormalSlot, 1);
+	glass.EnableLight();
+	glass.SetBlendMode(Engine::BlendMode::Transparent);
+	
+	phongLight.AddObject("glass", &glass);
+	
 	Engine::Transform nanosuitTransform = {
 		glm::vec3(10.0f, 10.0f, 10.0f),
 		glm::vec3(0.0f, 17.0f, -70.0f),
