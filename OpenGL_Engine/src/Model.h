@@ -66,6 +66,7 @@ namespace Engine
 		size_t GetObjectsCount() const;
 		glm::mat4 GetTransform() const { return m_Transform; }
 		glm::mat3 GetNormalMatrix() const { return m_NormalMatrix; }
+		std::vector<Part>& GetParts() { return m_Parts; }
 		
 		void SetTransform(const Transform& transform)
 		{

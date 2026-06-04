@@ -14,11 +14,13 @@ namespace Engine
         void CreateShaderInternal(const std::string& vsFile, const std::string& fsFile, const std::string& gsFile);
         unsigned int CompileShaderInternal(const char* source, unsigned int type);
     public:
+        Shader() {}
         Shader(const char* vsSource, const char* faSource, const char* gsShader = nullptr);
-        Shader(const std::string& vsFile = std::string{""}, const std::string& fsFile = std::string{""}, const std::string& gsShader = std::string{""});
+        Shader(const std::string& vsFile, const std::string& fsFile, const std::string& gsShader = std::string{""});
         ~Shader();
         
         void CreateShader(const std::string& vsFile = std::string{""}, const std::string& fsFile = std::string{""}, const std::string& gsFile = std::string{""});
+        void CreateShaderFromSource(const char* vsSource, const char* fsSource, const char* gsShader = nullptr);
         
         void Use() const;
         void UnUse() const;

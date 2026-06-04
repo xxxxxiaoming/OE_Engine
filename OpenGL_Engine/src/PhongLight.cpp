@@ -1,335 +1,44 @@
 #include <sstream>
 #include "PhongLight.h"
 
-// language=GLSL
-static const char vsShaderCode[] = R"glsl(
-#version 460 core
+#include <filesystem>
 
-layout(location = 0) in vec3 position;
-layout(location = 1) in vec2 texCoord;
-layout(location = 3) in vec3 normal;
-layout(location = 5) in vec3 tangent;
-layout(location = 6) in vec3 bitangent; 
-
-uniform mat4 u_Model;
-uniform mat4 u_View;
-uniform mat4 u_Projection;
-uniform vec3 u_CameraPosition;	// 相机世界坐标
-uniform mat3 u_NormalMat;       // 法线变换矩阵(模型变换矩阵左上角3x3的逆矩阵的转置矩阵)
-uniform mat4 u_LightSpace;
-
-out vec2 v_TexCoord;
-out vec3 v_Normal;
-out vec3 v_LookAtCamera;
-out vec3 v_FragPosition;
-out vec4 v_LightSpacePosition;
-out vec3 v_T;
-out vec3 v_B;
-out vec3 v_N;
-
-void main() {
-	gl_Position = u_Projection * u_View * u_Model * vec4(position, 1.0f);
-	vec4 worldPosition = u_Model * vec4(position, 1.0);
-	v_TexCoord = texCoord;
-	v_Normal = normalize(u_NormalMat * normal);
-	v_LookAtCamera = u_CameraPosition.xyz - worldPosition.xyz;
-	v_FragPosition = vec3(worldPosition);
-    v_LightSpacePosition = u_LightSpace * u_Model * vec4(position, 1.0);
-    mat3 model3 = mat3(u_Model);
-    v_T = model3 * tangent;
-    v_B = model3 * bitangent;
-    v_N = u_NormalMat * normal;
-}
-)glsl";
-
-// language=GLSL
-static const char fsShaderCode[] = R"glsl(
-#version 460 core
-
-const int MAX_POINT_OR_SPOT_LIGHT_NUM = 4;
-
-struct Material {
-    sampler2D ambient;
-    sampler2D diffuse;  // 材质漫反射贴图
-    sampler2D specular; // 材质高光反射贴图
-    sampler2D normal;   // 材质法线贴图
-    int shininess;      // 材质镜面反射率（控制高光光斑的大小）
-};
-
-struct LightColor {
-    vec3 ambient;   // 环境光的颜色
-    vec3 diffuse;   // 光源漫反射光的颜色
-    vec3 specular;  // 光源高光的颜色
-};
-
-/* 点光源 */
-struct PointLight {
-    vec3 position;
-
-    float constant;  // 常数衰减系数
-    float linear;    // 线性衰减系数
-    float quadratic; // 二次衰减系数   
-
-    LightColor color;
-};
-
-/* 聚光 */
-struct SpotLight {
-    vec3 position;
-    vec3 direction;
-    
-    float innerAngle; // angle in radians
-    float outterAngle;// angle in radians
-    
-    float constant;  // 常数衰减系数
-    float linear;    // 线性衰减系数
-    float quadratic; // 二次衰减系数   
-
-    LightColor color;
-};
-
-/* 方向光 */
-struct DirectionLight {
-    vec3 direction; // 光源方向
-
-    LightColor color;
-};
-
-/* 光源配置 */
-struct LightConfig {
-    bool enableDirectionLight;  // 方向光的开关
-    int spotLightNum;           // 点光源个数，做多支持MAX_POINT_OR_SPOT_NUM这么多个，这个数量没有什么依据，我自己说的
-    int pointLightNum;          // 点光源个数，做多支持MAX_POINT_OR_SPOT_NUM这么多个，这个数量没有什么依据，我自己说的
-};
-
-
-uniform LightConfig u_LightConfig;
-uniform DirectionLight u_DirectionLight;
-uniform PointLight u_PointLights[MAX_POINT_OR_SPOT_LIGHT_NUM];
-uniform SpotLight u_SpotLights[MAX_POINT_OR_SPOT_LIGHT_NUM];
-uniform Material u_Material;
-uniform sampler2D u_ShadowDepthMap;
-uniform float u_FarPlane;
-uniform samplerCube u_PointLightsDepthMap[MAX_POINT_OR_SPOT_LIGHT_NUM];
-
-in vec2 v_TexCoord;
-in vec3 v_Normal;
-in vec3 v_LookAtCamera;
-in vec3 v_FragPosition;
-in vec4 v_LightSpacePosition;
-in vec3 v_T;
-in vec3 v_B;
-in vec3 v_N;
-
-out vec4 color;
-
-vec3 normal_Normalized;
-vec3 lookAtCamera_Normalized;
-float reflectDamping = 1.0; // 反射衰减系数，镜面反射光的强度衰减
-vec3 sampleOffsetDirections[20] = vec3[]
-(
-   vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1), 
-   vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
-   vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0),
-   vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
-   vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1)
-);
-
-vec3 calcDirectionLight(vec3 sampleColorAmbient, vec3 sampleColorDiffuse, vec3 sampleColorSpecular)
-{
-    if(!u_LightConfig.enableDirectionLight)
-        return vec3(0.0);
-
-    vec3 result = vec3(0.0);
-
-    ivec2 depthMapSize = textureSize(u_ShadowDepthMap, 0);
-    vec2 texelSize = vec2(1.0 / depthMapSize.x, 1.0 / depthMapSize.y);
-
-    float diffuse = 0.0;
-
-    float shadowDebuff = 0.0;
-
-    // 1. 将裁剪空间坐标转换到 [0, 1] 的 NDC 空间
-    vec3 shadowMapPositionNDC = (v_LightSpacePosition.xyz / v_LightSpacePosition.w) * 0.5 + 0.5;
-    // 2. 正确使用 NDC 空间的 xy 作为 UV 坐标去采样阴影图
-    vec2 shadowMapTexCoord = shadowMapPositionNDC.xy;
-
-    // 3. 跟深度一个偏移值，消除摩尔纹
-    vec3 lightDir = normalize(-u_DirectionLight.direction);
-    float bias = max(0.005 * (1.0 - dot(normal_Normalized, lightDir)), 0.0005);
-
-    for(int x = -1; x <= 1; x++)
-        for(int y = -1; y <= 1; y++)
-        {
-    
-            float shadowMapDepth = texture(u_ShadowDepthMap, shadowMapTexCoord + vec2(x, y) * texelSize).r;
-            shadowDebuff += (shadowMapPositionNDC.z - bias) > shadowMapDepth ? 0.0 : 1.0;
-        }
-
-    shadowDebuff /= 9.0;
-    shadowDebuff = shadowMapPositionNDC.z > 1.0 ? 1.0 : shadowDebuff;
-        
-    vec3 ambientLight = u_DirectionLight.color.ambient * sampleColorAmbient;
-    vec3 diffuseLight = u_DirectionLight.color.diffuse * max(dot(normalize(-u_DirectionLight.direction),normal_Normalized), 0.0) * sampleColorDiffuse;
-    vec3 specularLight = u_DirectionLight.color.specular * pow(max(dot(lookAtCamera_Normalized, reflect(normalize(u_DirectionLight.direction), normal_Normalized)), 0.0), u_Material.shininess) * sampleColorSpecular * reflectDamping;
-
-    result = ambientLight + diffuseLight * shadowDebuff + specularLight * shadowDebuff;
-    return result;
-}
-
-vec3 calcPointLights(vec3 sampleColorAmbient, vec3 sampleColorDiffuse, vec3 sampleColorSpecular)
-{
-    if(u_LightConfig.pointLightNum <= 0)
-        return vec3(0.0);
-
-    vec3 result = vec3(0.0);
-
-    float diffuse = 0.0;
-    float specular = 0.0;
-    float attenuation = 1.0; // 聚光源随着距离衰减的系数
-    
-    vec3 diffuseLight = vec3(0.0);
-    vec3 specularLight = vec3(0.0);
-    vec3 ambientLight = vec3(0.0);
-    vec3 lookAtLight = vec3(0.0);
-
-    int num = min(u_LightConfig.pointLightNum, MAX_POINT_OR_SPOT_LIGHT_NUM);
-    int samples = 20;
-    float viewDistance = length(v_LookAtCamera);
-    float diskRadius = 0.05;
-    for (int i = 0; i < num; ++i)
-    {
-        PointLight light = u_PointLights[i];
-        lookAtLight = light.position - v_FragPosition;
-
-        float lightDistance = length(lookAtLight);
-        attenuation = 1.0 / (light.constant + light.linear * lightDistance + light.quadratic * lightDistance * lightDistance);
-        
-        ambientLight = light.color.ambient * sampleColorAmbient;
-
-        diffuse = max(dot(normal_Normalized, normalize(lookAtLight)), 0.0);
-        diffuseLight = diffuse * light.color.diffuse * sampleColorDiffuse;
-
-        float bias = 0.05;
-        float shadowDebuff = 0.0;
-        
-        for(int j = 0; j < samples; ++j)
-        {
-            float closestDepth = texture(u_PointLightsDepthMap[i], normalize(-lookAtLight) + sampleOffsetDirections[j] * diskRadius).r;
-            closestDepth *= u_FarPlane;
-            
-            shadowDebuff += ((lightDistance - bias < closestDepth) ? 1.0 : 0.0);
-        }
-        
-       shadowDebuff /= float(samples);
-
-        vec3 reflectVec = reflect(-normalize(lookAtLight), normal_Normalized);
-        vec3 halfWayVec = normalize(lookAtCamera_Normalized + normalize(lookAtLight));
-        specular = pow(max(dot(normal_Normalized, halfWayVec), 0.0), u_Material.shininess);
-        specularLight = specular * light.color.specular * sampleColorSpecular * reflectDamping;
-        result += ((ambientLight + diffuseLight * shadowDebuff + specularLight * shadowDebuff) * attenuation);
-    }
-    return result;
-}
-
-vec3 calcSpotLight(vec3 sampleColorAmbient, vec3 sampleColorDiffuse, vec3 sampleColorSpecular)
-{
-     if(u_LightConfig.spotLightNum <= 0)
-        return vec3(0.0);
-
-     vec3 result = vec3(0.0);
-
-     float diffuse = 0.0;
-     float specular = 0.0;
-     float spotFactor = 1.0;
-     float attenuation = 1.0; // 聚光源随着距离衰减的系数
-
-     vec3 diffuseLight = vec3(0.0);
-     vec3 specularLigt = vec3(0.0);
-     vec3 ambientLight = vec3(0.0);
-     vec3 lookAtLight = vec3(0.0);
-
-     int num = min(u_LightConfig.spotLightNum, MAX_POINT_OR_SPOT_LIGHT_NUM);
-     for(int i = 0; i < num; i++)
-     {
-        SpotLight light = u_SpotLights[i];
-
-        lookAtLight = light.position - v_FragPosition;
-        float lightDistance = length(light.position - v_FragPosition);
-        float temp = dot(normalize(light.direction), normalize(-lookAtLight));
-        
-        spotFactor = clamp((temp - cos(light.outterAngle)) / (cos(light.innerAngle) - cos(light.outterAngle)), 0.0, 1.0);
-        attenuation = 1.0 / (light.constant + light.linear * lightDistance + light.quadratic * lightDistance * lightDistance);
-        ambientLight = light.color.ambient * sampleColorAmbient;
-        
-        diffuse = max(dot(normal_Normalized, normalize(lookAtLight)), 0.0);
-        diffuseLight = diffuse * light.color.diffuse * sampleColorDiffuse;
-
-        vec3 reflectVec = reflect(-normalize(lookAtLight), normal_Normalized);
-        specular = pow(max(dot(lookAtCamera_Normalized, reflectVec), 0.0), u_Material.shininess);
-        specularLigt = specular * light.color.specular * sampleColorSpecular * reflectDamping;
-        result += ((ambientLight + diffuseLight + specularLigt) * spotFactor * attenuation + (1 - spotFactor) * ambientLight * attenuation);
-     }
-
-     return result;
-}
-
-mat3 correctionTBN(vec3 v_T, vec3 v_B, vec3 v_N)
-{
-    vec3 T = normalize(v_T);
-    vec3 B = normalize(v_B);
-    vec3 N = normalize(v_N);
-
-    T = normalize(T - dot(T,N)*N);
-
-    float handedness = sign(dot(cross(N, T), B));
-    B = cross(N, T) * handedness;
-
-    mat3 TBN = mat3(T,B,N);
-
-    return TBN;
-}
-
-
-void main() {
-    vec3 sampleColorDiffuse = texture(u_Material.diffuse, v_TexCoord).rgb;
-    vec3 sampleColorSpecular = texture(u_Material.specular, v_TexCoord).rgb;
-    vec3 sampleColorAmbient = texture(u_Material.ambient, v_TexCoord).rgb; // TODO: 环境反射(比如天空盒)用的，现在暂时用不上
-    vec3 light = vec3(0.0, 0.0, 0.0);
-    vec3 sampleNormal = texture(u_Material.normal, v_TexCoord).rgb;
-
-    // gamma correction
-    sampleColorAmbient = pow(sampleColorAmbient, vec3(2.2));
-    sampleColorDiffuse = pow(sampleColorDiffuse, vec3(2.2));
-    sampleColorSpecular = pow(sampleColorSpecular, vec3(2.2));
-    //sampleNormal = pow(sampleNormal, vec3(2.2));
-
-    mat3 TBN = correctionTBN(v_T, v_B, v_N);
-
-    sampleNormal = sampleNormal * 2 - 1;
-    sampleNormal = TBN * sampleNormal;
-
-    normal_Normalized = normalize(sampleNormal);
-    //normal_Normalized = normalize(v_Normal);
-    lookAtCamera_Normalized = normalize(v_LookAtCamera);
-
-    light = calcDirectionLight(sampleColorDiffuse, sampleColorDiffuse, sampleColorSpecular) + calcPointLights(sampleColorDiffuse, sampleColorDiffuse, sampleColorSpecular) + calcSpotLight(sampleColorDiffuse, sampleColorDiffuse, sampleColorSpecular);
-
-    color = vec4(light, texture(u_Material.diffuse, v_TexCoord).a);
-
-    // gamma correction
-    //color = vec4(pow(color.rgb, vec3(1.0/2.2)), color.a);
-
-    /* 注意，这里是将纹理上，对应坐标的颜色RGB完完整整取出来，不会管Alpha通道的值的，就算Alpha是0，也会被完整取出来，写入到frame buffer中 */
-    /* 所以要么在OpenGL开启Blend，要么在这里，自行过滤： */
-    //if(color.a < 0.1)
-    //{
-        //discard;
-    //}
-}
-)glsl";
+#include "PLVS.h"
+#include "PLFS.h"
+#include "PLFSDR.h"
+#include "PLVSDR.h"
 
 static const int MAX_NON_DIRECTIONAL_LIGHTS = 4;
+
+void Engine::PhongLight::UnblockModelInternal(Model* model)
+{
+    std::vector<Part>& allParts = model -> GetParts();
+    for (auto& part : allParts)
+    {   
+        int index = 0;
+        for (auto& object : part.objects)
+        {
+            UnblockObjectInternal(&object);
+            index++;
+        }
+    }
+}
+
+void Engine::PhongLight::UnblockObjectInternal(Object* object)
+{
+    switch (object->GetBlendMode())
+    {
+    case BlendMode::Opaque :
+    case BlendMode::Masked :
+        object->m_Material.shader = &m_ShaderGBuffer;
+        break;
+    case BlendMode::Transparent:
+        object->m_Material.shader = &m_ShaderLightForward;
+        break;
+    }
+    
+    object->EnableLight();
+}
 
 void Engine::PhongLight::GenerateShadowMapInternal(Renderer& renderer)
 {
@@ -403,10 +112,95 @@ void Engine::PhongLight::GenerateSpecificShadowMapPointInternal(int index, Rende
     GLCALL(glBindTextureUnit(1 + index, shadowMapPoint.GetShadowMap()));
 }
 
-Engine::PhongLight::PhongLight(int shadowMapResolution) : 
-    m_Shader(vsShaderCode, fsShaderCode), 
+void Engine::PhongLight::ForwardRenderInternal(const Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
+{
+    m_RTLight.BindFramebuffer();
+    m_ShaderLightForward.Use();
+        
+    for (auto& objectPair : m_TransparentObjects)
+    {
+        Object* object = objectPair.second;
+        if (object != nullptr)
+        {
+            ConfigMVPMatrix(object->GetTransform(), viewMatrix, projectionMatrix);
+            ConfigNormalMatrix(object->GetNormalMatrix());
+
+            renderer.EnableBlend();
+            object->OnDraw();
+            renderer.DrawElements(object->GetIndexCount(), nullptr);
+            renderer.DisableBlend();
+        }
+    }
+    
+    m_ShaderLightForward.UnUse();
+    m_RTLight.UnbindFramebuffer();
+}
+
+void Engine::PhongLight::DefferedRenderInternal(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
+{
+    // Generate g-buffer
+    m_ShaderGBuffer.Use();
+    m_RTGbuffer.BindFramebuffer();
+    
+    renderer.OnRender();
+    renderer.DisableBlend();
+    
+    for (auto& objectPair : m_OpaqueObjects)
+    {
+        Object* object = objectPair.second;
+        if (object != nullptr)
+        {
+            ConfigMVPMatrix(object->GetTransform(), viewMatrix, projectionMatrix);
+            ConfigNormalMatrix(object->GetNormalMatrix());
+            
+            
+            object->OnDraw();
+            renderer.DrawElements(object->GetIndexCount(), nullptr);
+        }
+    }
+    
+    renderer.EnableBlend();
+    
+    m_ShaderGBuffer.UnUse();
+    m_RTGbuffer.UnbindFramebuffer();
+    
+    // Generate final frame
+    m_ShaderLight.Use();
+    m_RTLight.BindFramebuffer();
+    
+    uint32_t positionBuffer = m_RTGbuffer.GetTextureBuffer(0);
+    uint32_t lightSpacePosBuffer = m_RTGbuffer.GetTextureBuffer(1);
+    uint32_t normalBuffer = m_RTGbuffer.GetTextureBuffer(2);
+    uint32_t albedoSpecBuffer = m_RTGbuffer.GetTextureBuffer(3);
+    
+    GLCALL(glBindTextureUnit(6, positionBuffer));
+    GLCALL(glBindTextureUnit(7, lightSpacePosBuffer));
+    GLCALL(glBindTextureUnit(8, normalBuffer));
+    GLCALL(glBindTextureUnit(9, albedoSpecBuffer));
+    
+    m_ShaderLight.SetUniform1i("u_PositionMap", 6);
+    m_ShaderLight.SetUniform1i("u_DLightSpacePositionMap", 7);
+    m_ShaderLight.SetUniform1i("u_NormalMap", 8);
+    m_ShaderLight.SetUniform1i("u_AlbedoSpecMap", 9);
+    
+    renderer.OnRender();
+    // renderer.DisableDepthTest();
+    
+    m_RenderRect.OnDraw();
+    
+    renderer.DrawElements(m_RenderRect.GetIndexCount(), nullptr);
+    // renderer.EnableDepthTest();
+    
+    m_ShaderLight.UnUse();
+    m_RTLight.UnbindFramebuffer();
+}
+
+Engine::PhongLight::PhongLight(int shadowMapResolution, bool bDeffered) : 
     m_ShadowMap(shadowMapResolution, false),
-    m_ShadowMapResolution(shadowMapResolution)
+    m_UseDeffered(bDeffered),
+    m_ShadowMapResolution(shadowMapResolution),
+    m_RTGbuffer(1270, 740, true),
+    m_RTLight(1270, 740, true)
 {
     m_ShadowMapPoint.reserve(MAX_NON_DIRECTIONAL_LIGHTS);
     m_PointLightsNeedCapture.reserve(MAX_NON_DIRECTIONAL_LIGHTS);
@@ -414,24 +208,62 @@ Engine::PhongLight::PhongLight(int shadowMapResolution) :
     for (int i = 0; i < MAX_NON_DIRECTIONAL_LIGHTS; i++)
         m_PointLightsNeedCapture.emplace_back(false);
     
-    m_Shader.Use();
+
+    uint32_t colorAttachments[4] = {0,1,2,3};
+        
+    m_ShaderLightForward.CreateShaderFromSource(vsShaderCode, fsShaderCode);
+    m_ShaderLight.CreateShaderFromSource(vsShaderCodeLight, fsShaderCodeLight);
+    m_ShaderGBuffer.CreateShaderFromSource(vsShaderCodeDR, fsShaderCodeDR);
+        
+    m_RTGbuffer.CreateColorAttachment(0);
+    m_RTGbuffer.CreateColorAttachment(1);
+    m_RTGbuffer.CreateColorAttachment(2);
+    m_RTGbuffer.CreateColorAttachment(3, GL_RGBA);
+    m_RTGbuffer.CreateRenderBuffer();
+    m_RTGbuffer.UseMultiColorAttachments(colorAttachments, 4);
+        
+    m_RTLight.CreateColorAttachment(0);
+    m_RTLight.CreateRenderBuffer();
+        
+    vec3 rectPos[1] = { vec3{-1.0f, -1.0f, 0.0f} };
+    Vertex vertices[4];
+    uint32_t indices[6];
+    float widthHDRRect[1] = { 2.0f };
+    float heightHDRRect[1] = { 2.0f };
+    std::string assetDirector{ "res/texture" };
+	
+    createRectangle(rectPos, widthHDRRect, heightHDRRect, vertices, indices);
+    m_RenderRect(vertices, indices, 4, 6, assetDirector);
+    m_RenderRect.DisableLight();
+    
     
     /* 默认只开启方向光源 */
-    m_Shader.SetUniform1i("u_LightConfig.enableDirectionLight", 1);	// 开启方向光源
-    m_Shader.SetUniform1i("u_LightConfig.pointLightNum", 0);			// 不使用点光源
-    m_Shader.SetUniform1i("u_LightConfig.spotLightNum", 0);			// 不使用聚光源
+    m_ShaderLight.SetUniform1i("u_LightConfig.enableDirectionLight", 1);	// 开启方向光源
+    m_ShaderLight.SetUniform1i("u_LightConfig.pointLightNum", 0);			// 不使用点光源
+    m_ShaderLight.SetUniform1i("u_LightConfig.spotLightNum", 0);			// 不使用聚光源
     
     /* 方向光配置 */
-    m_Shader.SetUniform3f("u_DirectionLight.direction", 1.0f, 1.0f, 1.0f);
-    m_Shader.SetUniform3f("u_DirectionLight.color.ambient", 0.5f, 0.5f, 0.5f);
-    m_Shader.SetUniform3f("u_DirectionLight.color.diffuse", 1.0f, 1.0f, 1.0f);
-    m_Shader.SetUniform3f("u_DirectionLight.color.specular", 0.7f, 0.7f, 0.7f);
+    m_ShaderLight.SetUniform3f("u_DirectionLight.direction", 1.0f, 1.0f, 1.0f);
+    m_ShaderLight.SetUniform3f("u_DirectionLight.color.ambient", 0.5f, 0.5f, 0.5f);
+    m_ShaderLight.SetUniform3f("u_DirectionLight.color.diffuse", 1.0f, 1.0f, 1.0f);
+    m_ShaderLight.SetUniform3f("u_DirectionLight.color.specular", 0.7f, 0.7f, 0.7f);
     
-    m_Shader.UnUse();
+     /* 默认只开启方向光源 */
+    m_ShaderLightForward.SetUniform1i("u_LightConfig.enableDirectionLight", 1);	// 开启方向光源
+    m_ShaderLightForward.SetUniform1i("u_LightConfig.pointLightNum", 0);			// 不使用点光源
+    m_ShaderLightForward.SetUniform1i("u_LightConfig.spotLightNum", 0);			// 不使用聚光源
+        
+    /* 方向光配置 */
+    m_ShaderLightForward.SetUniform3f("u_DirectionLight.direction", 1.0f, 1.0f, 1.0f);
+    m_ShaderLightForward.SetUniform3f("u_DirectionLight.color.ambient", 0.5f, 0.5f, 0.5f);
+    m_ShaderLightForward.SetUniform3f("u_DirectionLight.color.diffuse", 1.0f, 1.0f, 1.0f);
+    m_ShaderLightForward.SetUniform3f("u_DirectionLight.color.specular", 0.7f, 0.7f, 0.7f);
+    
 }
 
 void Engine::PhongLight::TurnOn(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
 {
+    // Check if shadow map captured.
     for (int i = 0; i < MAX_NON_DIRECTIONAL_LIGHTS; i++)
     {
         if (m_PointLightsNeedCapture[i])
@@ -444,98 +276,114 @@ void Engine::PhongLight::TurnOn(Renderer& renderer, const glm::mat4& viewMatrix,
         m_ShadowMapCaptured = true;
     }
     
-    if (!m_Shader.CheckShaderValidity())
+    if (!m_ShaderLight.CheckShaderValidity() || !m_ShaderLightForward.CheckShaderValidity())
         return;
     
     uint32_t shadowMap = m_ShadowMap.GetShadowMap();
     GLCALL(glBindTextureUnit(5, shadowMap));
-    m_Shader.SetUniform1i("u_ShadowDepthMap", 5);
+    m_ShaderLight.SetUniform1i("u_ShadowDepthMap", 5);
+
+    DefferedRenderInternal(renderer, viewMatrix, projectionMatrix);
     
-    m_Shader.Use();
-    for (auto& modelPair : m_Models)
-    {
-        Model* model = modelPair.second;
-        if (model != nullptr)
-        {
-            ConfigMVPMatrix(model->GetTransform(), viewMatrix, projectionMatrix);
-            ConfigNormalMatrix(model->GetNormalMatrix());
-            
-            renderer.DisableBlend();
-            model->Draw(renderer);
-            renderer.EnableBlend();
-        }
-    }
-        
-    for (auto& objectPair : m_Objects)
-    {
-        Object* object = objectPair.second;
-        if (object != nullptr)
-        {
-            ConfigMVPMatrix(object->GetTransform(), viewMatrix, projectionMatrix);
-            ConfigNormalMatrix(object->GetNormalMatrix());
-            
-            object->OnDraw();
-            renderer.DrawElements(object->GetIndexCount(), nullptr);
-        }
-    }
+    GLCALL(glBindFramebuffer(GL_READ_FRAMEBUFFER, m_RTGbuffer.GetFBO()));
+    GLCALL(glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_RTLight.GetFBO()));
+    GLCALL(glBlitFramebuffer(0, 0, 1270, 740, 0, 0, 1270, 740, GL_DEPTH_BUFFER_BIT, GL_NEAREST));
+    GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+    
+    ForwardRenderInternal(renderer, viewMatrix, projectionMatrix);
 }
 
 void Engine::PhongLight::TurnOff(Renderer& renderer) const
 {
-    if (!m_Shader.CheckShaderValidity())
+    if (m_UseDeffered && m_ShaderGBuffer.CheckShaderValidity())
+        m_ShaderGBuffer.UnUse();
+    
+    if (!m_ShaderLight.CheckShaderValidity())
         return;
     
-    m_Shader.UnUse();
+    m_ShaderLight.UnUse();
+    
+    if (!m_ShaderLightForward.CheckShaderValidity())
+        return;
+    
+    m_ShaderLightForward.UnUse();
 }
 
 /* Directional Light */
 
 void Engine::PhongLight::EnableDirectionLight()
 {
-    if (!m_Shader.CheckShaderValidity())
+    if (!m_ShaderLight.CheckShaderValidity())
         return;
     
-    m_Shader.SetUniform1i("u_LightConfig.enableDirectionLight", 1);
+    m_ShaderLight.SetUniform1i("u_LightConfig.enableDirectionLight", 1);
+    
+    if (!m_ShaderLightForward.CheckShaderValidity())
+        return;
+    
+    m_ShaderLightForward.SetUniform1i("u_LightConfig.enableDirectionLight", 1);
 }
 
 void Engine::PhongLight::DisableDirectionLight()
 {
-    if (!m_Shader.CheckShaderValidity())
+    if (!m_ShaderLight.CheckShaderValidity())
         return;
     
-    m_Shader.SetUniform1i("u_LightConfig.enableDirectionLight", 0);
+    m_ShaderLight.SetUniform1i("u_LightConfig.enableDirectionLight", 0);
+    
+    if (!m_ShaderLightForward.CheckShaderValidity())
+        return;
+    
+    m_ShaderLightForward.SetUniform1i("u_LightConfig.enableDirectionLight", 0);
 }
 
 void Engine::PhongLight::ConfigDirectionLight(const vec3& direction, const vec3& ambient, const vec3& diffuse, const vec3& specular)
 {
-    if (!m_Shader.CheckShaderValidity())
+    if (!m_ShaderLight.CheckShaderValidity())
         return;
     
-    m_Shader.SetUniform3f("u_DirectionLight.direction", direction.x, direction.y, direction.z);
-    m_Shader.SetUniform3f("u_DirectionLight.color.ambient", ambient.x, ambient.y, ambient.z);
-    m_Shader.SetUniform3f("u_DirectionLight.color.diffuse", diffuse.x, diffuse.y, diffuse.z);
-    m_Shader.SetUniform3f("u_DirectionLight.color.specular", specular.x, specular.y, specular.z);
+    m_ShaderLight.SetUniform3f("u_DirectionLight.direction", direction.x, direction.y, direction.z);
+    m_ShaderLight.SetUniform3f("u_DirectionLight.color.ambient", ambient.x, ambient.y, ambient.z);
+    m_ShaderLight.SetUniform3f("u_DirectionLight.color.diffuse", diffuse.x, diffuse.y, diffuse.z);
+    m_ShaderLight.SetUniform3f("u_DirectionLight.color.specular", specular.x, specular.y, specular.z);
+    
+    if (!m_ShaderLightForward.CheckShaderValidity())
+        return;
+    
+    m_ShaderLightForward.SetUniform3f("u_DirectionLight.direction", direction.x, direction.y, direction.z);
+    m_ShaderLightForward.SetUniform3f("u_DirectionLight.color.ambient", ambient.x, ambient.y, ambient.z);
+    m_ShaderLightForward.SetUniform3f("u_DirectionLight.color.diffuse", diffuse.x, diffuse.y, diffuse.z);
+    m_ShaderLightForward.SetUniform3f("u_DirectionLight.color.specular", specular.x, specular.y, specular.z);
 }
 
 /* Point Light */
 
 bool Engine::PhongLight::AddPointLight(const vec3& position, const vec3& ambient, const vec3& diffuse, const vec3& specular, float constant, float linear, float quadratic)
 {
-    if (!m_Shader.CheckShaderValidity() || m_PointLightIndex >= MAX_NON_DIRECTIONAL_LIGHTS)
+    if (!m_ShaderLight.CheckShaderValidity() || !m_ShaderLightForward.CheckShaderValidity() || m_PointLightIndex >= MAX_NON_DIRECTIONAL_LIGHTS)
         return false;
     
     std::string uniformName = "u_PointLights[" + std::to_string(m_PointLightIndex) + "].";
     std::string uniformNamePointDepthMap = "u_PointLightsDepthMap[" + std::to_string(m_PointLightIndex) + "]";
     
-    m_Shader.SetUniform3f(uniformName + "position", position.x, position.y, position.z);
-    m_Shader.SetUniform1f(uniformName + "constant", constant);
-    m_Shader.SetUniform1f(uniformName + "linear", linear);
-    m_Shader.SetUniform1f(uniformName + "quadratic", quadratic);
-    m_Shader.SetUniform3f(uniformName + "color.ambient", ambient.x, ambient.y, ambient.z);
-    m_Shader.SetUniform3f(uniformName + "color.diffuse", diffuse.x, diffuse.y, diffuse.z);
-    m_Shader.SetUniform3f(uniformName + "color.specular", specular.x, specular.y, specular.z);
-    m_Shader.SetUniform1i(uniformNamePointDepthMap, m_PointLightIndex + 1);
-    m_Shader.SetUniform1i("u_LightConfig.pointLightNum", ++m_PointLightIndex);
+    m_ShaderLight.SetUniform3f(uniformName + "position", position.x, position.y, position.z);
+    m_ShaderLight.SetUniform1f(uniformName + "constant", constant);
+    m_ShaderLight.SetUniform1f(uniformName + "linear", linear);
+    m_ShaderLight.SetUniform1f(uniformName + "quadratic", quadratic);
+    m_ShaderLight.SetUniform3f(uniformName + "color.ambient", ambient.x, ambient.y, ambient.z);
+    m_ShaderLight.SetUniform3f(uniformName + "color.diffuse", diffuse.x, diffuse.y, diffuse.z);
+    m_ShaderLight.SetUniform3f(uniformName + "color.specular", specular.x, specular.y, specular.z);
+    m_ShaderLight.SetUniform1i(uniformNamePointDepthMap, m_PointLightIndex + 1);
+    m_ShaderLight.SetUniform1i("u_LightConfig.pointLightNum", ++m_PointLightIndex);
+    
+    m_ShaderLightForward.SetUniform3f(uniformName + "position", position.x, position.y, position.z);
+    m_ShaderLightForward.SetUniform1f(uniformName + "constant", constant);
+    m_ShaderLightForward.SetUniform1f(uniformName + "linear", linear);
+    m_ShaderLightForward.SetUniform1f(uniformName + "quadratic", quadratic);
+    m_ShaderLightForward.SetUniform3f(uniformName + "color.ambient", ambient.x, ambient.y, ambient.z);
+    m_ShaderLightForward.SetUniform3f(uniformName + "color.diffuse", diffuse.x, diffuse.y, diffuse.z);
+    m_ShaderLightForward.SetUniform3f(uniformName + "color.specular", specular.x, specular.y, specular.z);
+    m_ShaderLightForward.SetUniform1i("u_LightConfig.pointLightNum", ++m_PointLightIndex);
     
     m_ShadowMapPoint.emplace_back(m_ShadowMapResolution, false);
     m_PointLightsNeedCapture[m_PointLightIndex - 1] = true;
@@ -545,12 +393,13 @@ bool Engine::PhongLight::AddPointLight(const vec3& position, const vec3& ambient
 
 bool Engine::PhongLight::ConfigPointLightPosition(int index, const vec3& position)
 {
-    if (!m_Shader.CheckShaderValidity() || index >= MAX_NON_DIRECTIONAL_LIGHTS)
+    if (!m_ShaderLight.CheckShaderValidity() || !m_ShaderLightForward.CheckShaderValidity() || index >= MAX_NON_DIRECTIONAL_LIGHTS)
         return false;
     
     std::string uniformName = "u_PointLights[" + std::to_string(index) + "].";
     
-    m_Shader.SetUniform3f(uniformName + "position", position.x, position.y, position.z);
+    m_ShaderLight.SetUniform3f(uniformName + "position", position.x, position.y, position.z);
+    m_ShaderLightForward.SetUniform3f(uniformName + "position", position.x, position.y, position.z);
     m_ShadowMapPoint[index].UpdateCapturePosition(glm::vec3{position.x, position.y, position.z});
     m_PointLightsNeedCapture[index] = true;
     
@@ -559,74 +408,96 @@ bool Engine::PhongLight::ConfigPointLightPosition(int index, const vec3& positio
 
 bool Engine::PhongLight::ConfigPointLightColor(int index, const vec3& ambient, const vec3& diffuse, const vec3& specular)
 {
-    if (!m_Shader.CheckShaderValidity() || index >= MAX_NON_DIRECTIONAL_LIGHTS)
+    if (!m_ShaderLight.CheckShaderValidity() || !m_ShaderLightForward.CheckShaderValidity() || index >= MAX_NON_DIRECTIONAL_LIGHTS)
         return false;
     
     std::string uniformName = "u_PointLights[" + std::to_string(index) + "].";
     
-    m_Shader.SetUniform3f(uniformName + "color.ambient", ambient.x, ambient.y, ambient.z);
-    m_Shader.SetUniform3f(uniformName + "color.diffuse", diffuse.x, diffuse.y, diffuse.z);
-    m_Shader.SetUniform3f(uniformName + "color.specular", specular.x, diffuse.y, diffuse.z);
+    m_ShaderLight.SetUniform3f(uniformName + "color.ambient", ambient.x, ambient.y, ambient.z);
+    m_ShaderLight.SetUniform3f(uniformName + "color.diffuse", diffuse.x, diffuse.y, diffuse.z);
+    m_ShaderLight.SetUniform3f(uniformName + "color.specular", specular.x, diffuse.y, diffuse.z);
+    
+    m_ShaderLightForward.SetUniform3f(uniformName + "color.ambient", ambient.x, ambient.y, ambient.z);
+    m_ShaderLightForward.SetUniform3f(uniformName + "color.diffuse", diffuse.x, diffuse.y, diffuse.z);
+    m_ShaderLightForward.SetUniform3f(uniformName + "color.specular", specular.x, diffuse.y, diffuse.z);
     
     return true;
 }
 
 bool Engine::PhongLight::ConfigPointLightAttenuation(int index, float constant, float linear, float quadratic)
 {
-    if (!m_Shader.CheckShaderValidity() || index >= MAX_NON_DIRECTIONAL_LIGHTS)
+    if (!m_ShaderLight.CheckShaderValidity() || !m_ShaderLightForward.CheckShaderValidity() || index >= MAX_NON_DIRECTIONAL_LIGHTS)
         return false;
     
     std::string uniformName = "u_PointLights[" + std::to_string(index) + "].";
     
-    m_Shader.SetUniform1f(uniformName + "constant", constant);
-    m_Shader.SetUniform1f(uniformName + "linear", linear);
-    m_Shader.SetUniform1f(uniformName + "quadratic", quadratic);
+    m_ShaderLight.SetUniform1f(uniformName + "constant", constant);
+    m_ShaderLight.SetUniform1f(uniformName + "linear", linear);
+    m_ShaderLight.SetUniform1f(uniformName + "quadratic", quadratic);
+    
+    m_ShaderLightForward.SetUniform1f(uniformName + "constant", constant);
+    m_ShaderLightForward.SetUniform1f(uniformName + "linear", linear);
+    m_ShaderLightForward.SetUniform1f(uniformName + "quadratic", quadratic);
     
     return true;
 }
 
 bool Engine::PhongLight::AddSpotLight(const vec3& position, const vec3& direction, const vec3& ambient, const vec3& diffuse, const vec3& specular, float innerAngle, float outterAngle, float constant, float linear, float quadratic)
 {
-    if (!m_Shader.CheckShaderValidity() || m_SpotLightIndex >= MAX_NON_DIRECTIONAL_LIGHTS)
+    if (!m_ShaderLight.CheckShaderValidity() || !m_ShaderLightForward.CheckShaderValidity() || m_SpotLightIndex >= MAX_NON_DIRECTIONAL_LIGHTS)
         return false;
     
     std::string uniformName = "u_SpotLights[" + std::to_string(m_SpotLightIndex) + "].";
     
-    m_Shader.SetUniform3f(uniformName + "position", position.x, position.y, position.z);
-    m_Shader.SetUniform3f(uniformName + "direction", direction.x, direction.y, direction.z);
-    m_Shader.SetUniform1f(uniformName + "innerAngle", glm::radians(innerAngle));
-    m_Shader.SetUniform1f(uniformName + "outterAngle", glm::radians(outterAngle));
-    m_Shader.SetUniform1f(uniformName + "constant", constant);
-    m_Shader.SetUniform1f(uniformName + "linear", linear);
-    m_Shader.SetUniform1f(uniformName + "quadratic", quadratic);
-    m_Shader.SetUniform3f(uniformName + "color.ambient", ambient.x, ambient.y, ambient.z);
-    m_Shader.SetUniform3f(uniformName + "color.diffuse", diffuse.x, diffuse.y, diffuse.z);
-    m_Shader.SetUniform3f(uniformName + "color.specular", specular.x, specular.y, specular.z);
-    m_Shader.SetUniform1i("u_LightConfig.spotLightNum", ++m_SpotLightIndex);
+    m_ShaderLight.SetUniform3f(uniformName + "position", position.x, position.y, position.z);
+    m_ShaderLight.SetUniform3f(uniformName + "direction", direction.x, direction.y, direction.z);
+    m_ShaderLight.SetUniform1f(uniformName + "innerAngle", glm::radians(innerAngle));
+    m_ShaderLight.SetUniform1f(uniformName + "outterAngle", glm::radians(outterAngle));
+    m_ShaderLight.SetUniform1f(uniformName + "constant", constant);
+    m_ShaderLight.SetUniform1f(uniformName + "linear", linear);
+    m_ShaderLight.SetUniform1f(uniformName + "quadratic", quadratic);
+    m_ShaderLight.SetUniform3f(uniformName + "color.ambient", ambient.x, ambient.y, ambient.z);
+    m_ShaderLight.SetUniform3f(uniformName + "color.diffuse", diffuse.x, diffuse.y, diffuse.z);
+    m_ShaderLight.SetUniform3f(uniformName + "color.specular", specular.x, specular.y, specular.z);
+    m_ShaderLight.SetUniform1i("u_LightConfig.spotLightNum", ++m_SpotLightIndex);
+    
+    m_ShaderLightForward.SetUniform3f(uniformName + "position", position.x, position.y, position.z);
+    m_ShaderLightForward.SetUniform3f(uniformName + "direction", direction.x, direction.y, direction.z);
+    m_ShaderLightForward.SetUniform1f(uniformName + "innerAngle", glm::radians(innerAngle));
+    m_ShaderLightForward.SetUniform1f(uniformName + "outterAngle", glm::radians(outterAngle));
+    m_ShaderLightForward.SetUniform1f(uniformName + "constant", constant);
+    m_ShaderLightForward.SetUniform1f(uniformName + "linear", linear);
+    m_ShaderLightForward.SetUniform1f(uniformName + "quadratic", quadratic);
+    m_ShaderLightForward.SetUniform3f(uniformName + "color.ambient", ambient.x, ambient.y, ambient.z);
+    m_ShaderLightForward.SetUniform3f(uniformName + "color.diffuse", diffuse.x, diffuse.y, diffuse.z);
+    m_ShaderLightForward.SetUniform3f(uniformName + "color.specular", specular.x, specular.y, specular.z);
+    m_ShaderLightForward.SetUniform1i("u_LightConfig.spotLightNum", ++m_SpotLightIndex);
     
     return true;
 }
 
 bool Engine::PhongLight::ConfigSpotLightPosition(int index, const vec3& position)
 {
-    if (!m_Shader.CheckShaderValidity() || index >= MAX_NON_DIRECTIONAL_LIGHTS)
+    if (!m_ShaderLight.CheckShaderValidity() || !m_ShaderLightForward.CheckShaderValidity() || index >= MAX_NON_DIRECTIONAL_LIGHTS)
         return false;
     
     std::string uniformName = "u_SpotLights[" + std::to_string(index) + "].";
     
-    m_Shader.SetUniform3f(uniformName + "position", position.x, position.y, position.z);
+    m_ShaderLight.SetUniform3f(uniformName + "position", position.x, position.y, position.z);
+    m_ShaderLightForward.SetUniform3f(uniformName + "position", position.x, position.y, position.z);
     
     return true;
 }
 
 bool Engine::PhongLight::ConfigSpotLightDirection(int index, const vec3& direction)
 {
-    if (!m_Shader.CheckShaderValidity() || index >= MAX_NON_DIRECTIONAL_LIGHTS)
+    if (!m_ShaderLight.CheckShaderValidity() || !m_ShaderLightForward.CheckShaderValidity() || index >= MAX_NON_DIRECTIONAL_LIGHTS)
         return false;
     
     std::string uniformName = "u_SpotLights[" + std::to_string(index) + "].";
     
-    m_Shader.SetUniform3f(uniformName + "direction", direction.x, direction.y, direction.z);
+    m_ShaderLight.SetUniform3f(uniformName + "direction", direction.x, direction.y, direction.z);
+    m_ShaderLightForward.SetUniform3f(uniformName + "direction", direction.x, direction.y, direction.z);
     
     return true;
 }
@@ -634,69 +505,95 @@ bool Engine::PhongLight::ConfigSpotLightDirection(int index, const vec3& directi
 
 bool Engine::PhongLight::ConfigSpotLightColor(int index, const vec3& ambient, const vec3& diffuse, const vec3& specular)
 {
-    if (!m_Shader.CheckShaderValidity() || index >= MAX_NON_DIRECTIONAL_LIGHTS)
+    if (!m_ShaderLight.CheckShaderValidity() || !m_ShaderLightForward.CheckShaderValidity() || index >= MAX_NON_DIRECTIONAL_LIGHTS)
         return false;
     
     std::string uniformName = "u_SpotLights[" + std::to_string(index) + "].";
     
-    m_Shader.SetUniform3f(uniformName + "color.ambient", ambient.x, ambient.y, ambient.z);
-    m_Shader.SetUniform3f(uniformName + "color.diffuse", diffuse.x, diffuse.y, diffuse.z);
-    m_Shader.SetUniform3f(uniformName + "color.specular", specular.x, specular.y, specular.z);
+    m_ShaderLight.SetUniform3f(uniformName + "color.ambient", ambient.x, ambient.y, ambient.z);
+    m_ShaderLight.SetUniform3f(uniformName + "color.diffuse", diffuse.x, diffuse.y, diffuse.z);
+    m_ShaderLight.SetUniform3f(uniformName + "color.specular", specular.x, specular.y, specular.z);
+    
+    m_ShaderLightForward.SetUniform3f(uniformName + "color.ambient", ambient.x, ambient.y, ambient.z);
+    m_ShaderLightForward.SetUniform3f(uniformName + "color.diffuse", diffuse.x, diffuse.y, diffuse.z);
+    m_ShaderLightForward.SetUniform3f(uniformName + "color.specular", specular.x, specular.y, specular.z);
     
     return true;
 }
 
 bool Engine::PhongLight::ConfigSpotLightAttenuation(int index, float constant, float linear, float quadratic)
 {
-    if (!m_Shader.CheckShaderValidity() || index >= MAX_NON_DIRECTIONAL_LIGHTS)
+    if (!m_ShaderLight.CheckShaderValidity() || !m_ShaderLightForward.CheckShaderValidity() || index >= MAX_NON_DIRECTIONAL_LIGHTS)
         return false;
     
     std::string uniformName = "u_SpotLights[" + std::to_string(index) + "].";
     
-    m_Shader.SetUniform1f(uniformName + "constant", constant);
-    m_Shader.SetUniform1f(uniformName + "linear", linear);
-    m_Shader.SetUniform1f(uniformName + "quadratic", quadratic);
+    m_ShaderLight.SetUniform1f(uniformName + "constant", constant);
+    m_ShaderLight.SetUniform1f(uniformName + "linear", linear);
+    m_ShaderLight.SetUniform1f(uniformName + "quadratic", quadratic);
+    
+    m_ShaderLightForward.SetUniform1f(uniformName + "constant", constant);
+    m_ShaderLightForward.SetUniform1f(uniformName + "linear", linear);
+    m_ShaderLightForward.SetUniform1f(uniformName + "quadratic", quadratic);
     
     return true;
 }
 
 bool Engine::PhongLight::ConfitSpotLightScale(int index, float innerAngle, float outterAngle)
 {
-    if (!m_Shader.CheckShaderValidity() || index >= MAX_NON_DIRECTIONAL_LIGHTS)
+    if (!m_ShaderLight.CheckShaderValidity() || !m_ShaderLightForward.CheckShaderValidity() || index >= MAX_NON_DIRECTIONAL_LIGHTS)
         return false;
     
     std::string uniformName = "u_SpotLights[" + std::to_string(index) + "].";
     
-    m_Shader.SetUniform1f(uniformName + "innerAngle", innerAngle);
-    m_Shader.SetUniform1f(uniformName + "outterAngle", outterAngle);
+    m_ShaderLight.SetUniform1f(uniformName + "innerAngle", innerAngle);
+    m_ShaderLight.SetUniform1f(uniformName + "outterAngle", outterAngle);
+    
+    m_ShaderLightForward.SetUniform1f(uniformName + "innerAngle", innerAngle);
+    m_ShaderLightForward.SetUniform1f(uniformName + "outterAngle", outterAngle);
     
     return true;
 }
 
 void Engine::PhongLight::ConfigMVPMatrix(const glm::mat4& modelMatrix, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
 {
-    if (!m_Shader.CheckShaderValidity())
+    m_ShaderGBuffer.SetUniformMatrix4f("u_Model", modelMatrix);
+    m_ShaderGBuffer.SetUniformMatrix4f("u_View", viewMatrix);
+    m_ShaderGBuffer.SetUniformMatrix4f("u_Projection", projectionMatrix);   
+    
+    if (!m_ShaderLightForward.CheckShaderValidity())
         return;
     
-    m_Shader.SetUniformMatrix4f("u_Model", modelMatrix);
-    m_Shader.SetUniformMatrix4f("u_View", viewMatrix);
-    m_Shader.SetUniformMatrix4f("u_Projection", projectionMatrix);
+    m_ShaderLightForward.SetUniformMatrix4f("u_Model", modelMatrix);
+    m_ShaderLightForward.SetUniformMatrix4f("u_View", viewMatrix);
+    m_ShaderLightForward.SetUniformMatrix4f("u_Projection", projectionMatrix);   
 }
 
 void Engine::PhongLight::ConfigNormalMatrix(const glm::mat3& normalMatrix)
 {
-    if (!m_Shader.CheckShaderValidity())
+    if (!m_ShaderGBuffer.CheckShaderValidity())
+        return;
+        
+    m_ShaderGBuffer.SetUniformMatrix3f("u_NormalMat", normalMatrix);
+    
+    if (!m_ShaderLightForward.CheckShaderValidity())
         return;
     
-    m_Shader.SetUniformMatrix3f("u_NormalMat", normalMatrix);
+    m_ShaderLightForward.SetUniformMatrix3f("u_NormalMat", normalMatrix);
+    
 }
 
 void Engine::PhongLight::ConfigCameraWorldPosition(const glm::vec3& position)
 {
-    if (!m_Shader.CheckShaderValidity())
+    if (!m_ShaderLight.CheckShaderValidity())
         return;
     
-    m_Shader.SetUniform3f("u_CameraPosition", position.x, position.y, position.z);
+    m_ShaderLight.SetUniform3f("u_CameraPosition", position.x, position.y, position.z);
+    
+    if (!m_ShaderLightForward.CheckShaderValidity())
+        return;
+    
+    m_ShaderLightForward.SetUniform3f("u_CameraPosition", position.x, position.y, position.z);
 }
 
 void Engine::PhongLight::ConfigShadowMapCaptureView(glm::vec3 capturePosition, glm::vec3 captureLookAt, float viewLeft, float viewRight, float viewBottom, float viewTop, float viewNear, float viewFar)
@@ -705,32 +602,67 @@ void Engine::PhongLight::ConfigShadowMapCaptureView(glm::vec3 capturePosition, g
     glm::mat4 projectionMatrix = glm::ortho(viewLeft, viewRight, viewBottom, viewTop, viewNear, viewFar);
     glm::mat4 lightSpace = projectionMatrix * shadowMapCaptureCam.GetViewMatrix();
     
-    m_Shader.SetUniformMatrix4f("u_LightSpace", lightSpace);
+    m_ShaderGBuffer.SetUniformMatrix4f("u_LightSpace", lightSpace);
+    
     m_ShadowMap.SetCaptureView(shadowMapCaptureCam, projectionMatrix);
 }
 
 void Engine::PhongLight::ConfigShadowMapPointCaptureView(int index, const glm::vec3& captureWorldPosition, float fov, float aspect, float nearPlane, float farPlane)
 {
-    m_Shader.SetUniform1f("u_FarPlane", farPlane);
+    m_ShaderLight.SetUniform1f("u_FarPlane", farPlane);
     m_ShadowMapPoint[index].SetCaptureView(captureWorldPosition, fov, aspect, nearPlane, farPlane);
     m_PointLightsNeedCapture[index] = true;
 }
 
 void Engine::PhongLight::AddModel(const std::string& name, Model* model)
 {
-    model -> BindShader(&m_Shader); 
-    model -> EnableLight();
+    // model -> BindShader(m_UseDeffered ? &m_ShaderGBuffer : &m_ShaderLight); 
+    // model -> EnableLight();
             
     if (m_Models.find(name) == m_Models.end())
         m_Models[name] = model;
+    
+    std::vector<Part>& allParts = model -> GetParts();
+    for (auto& part : allParts)
+    {   
+        size_t index = 0;
+        for (auto& object : part.objects)
+        {
+            std::string objectName = name + "_" + part.name + "_" + std::to_string(index);
+            AddObject(objectName, &object);
+            object.SetTransform(model->GetTransform());
+        }
+    }
 }
 void Engine::PhongLight::AddObject(const std::string& name, Object* object)
 {
-    object -> m_Material.shader = &m_Shader; 
-    object -> EnableLight();
-            
     if (m_Objects.find(name) == m_Objects.end())
         m_Objects[name] = object;
+    
+    switch (object->GetBlendMode())
+    {
+    case BlendMode::Opaque :
+        if (m_OpaqueObjects.find(name) == m_OpaqueObjects.end())
+        {
+            object->m_Material.shader = &m_ShaderGBuffer;
+            m_OpaqueObjects[name] = object;
+        }
+        break;
+    case BlendMode::Masked :
+        if (m_MaskedObjects.find(name) == m_MaskedObjects.end())
+        {
+            object->m_Material.shader = &m_ShaderGBuffer;
+            m_MaskedObjects[name] = object;
+        }
+        break;
+    case BlendMode::Transparent:
+        if (m_TransparentObjects.find(name) == m_TransparentObjects.end())
+        {
+            object->m_Material.shader = &m_ShaderLightForward;
+            m_TransparentObjects[name] = object;
+        }
+        break;
+    }
 }
         
 void Engine::PhongLight::RemoveModel(const std::string& name)
@@ -738,6 +670,17 @@ void Engine::PhongLight::RemoveModel(const std::string& name)
     if (m_Models.find(name) != m_Models.end())
     {
         Model* model = m_Models[name];
+        
+        std::vector<Part>& allParts = model -> GetParts();
+        for (auto& part : allParts)
+        {
+            for (size_t index = 0; index < part.objects.size(); index++)
+            {
+                std::string objectName = name + "_" + part.name + "_" + std::to_string(index);
+                RemoveObject(objectName);
+            }
+        }
+        
         model->BindShader(nullptr); 
         model->DisableLight();
             
@@ -753,5 +696,30 @@ void Engine::PhongLight::RemoveObject(const std::string& name)
         object->DisableLight();
         
         m_Objects.erase(name);
+    }
+    
+    if (m_OpaqueObjects.find(name) != m_OpaqueObjects.end())
+    {
+        Object* object = m_OpaqueObjects[name];
+        object->m_Material.shader = nullptr;
+        object->DisableLight();
+        
+        m_OpaqueObjects.erase(name);
+    }
+    else if(m_TransparentObjects.find(name) == m_TransparentObjects.end())
+    {
+        Object* object = m_TransparentObjects[name];
+        object->m_Material.shader = nullptr;
+        object->DisableLight();
+        
+        m_TransparentObjects.erase(name);
+    }
+    else if (m_MaskedObjects.find(name) == m_MaskedObjects.end())
+    {
+        Object* object = m_MaskedObjects[name];
+        object->m_Material.shader = nullptr;
+        object->DisableLight();
+        
+        m_MaskedObjects.erase(name);
     }
 }

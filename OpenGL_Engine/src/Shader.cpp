@@ -50,6 +50,11 @@ void Engine::Shader::CreateShader(const std::string& vsFile, const std::string& 
     CreateShaderInternal(vsFile, fsFile, gsFile);
 }
 
+void Engine::Shader::CreateShaderFromSource(const char* vsSource, const char* fsSource, const char* gsShader)
+{
+    CreateShaderFromSourceInternal(vsSource, fsSource, gsShader);
+}
+
 unsigned int Engine::Shader::CompileShaderInternal(const char* source, const unsigned int type)
 {
     GLCALL(unsigned int shaderID = glCreateShader(type));

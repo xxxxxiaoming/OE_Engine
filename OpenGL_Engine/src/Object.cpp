@@ -2,10 +2,17 @@
 #include <assimp/types.h>
 #include "Object.h"
 
-Engine::Object::Object(const Vertex* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t indexCount, std::string& assetDirectory, const Transform& transform) :  
+Engine::Object::Object() :
+	m_VertexCount(0), m_IndexCount(0), m_Transform(glm::mat4(1.0f)), m_NormalMatrix(glm::mat4(1.0f))
+{
+	
+}
+
+Engine::Object::Object(const Vertex* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t indexCount, std::string& assetDirectory, const Transform& transform, BlendMode blendMode) :  
 	m_VertexCount(vertexCount), 
 	m_IndexCount(indexCount), 
 	m_AssetDirectory(assetDirectory), 
+	m_BlendMode(blendMode),
 	m_Transform(GenerateModelMatrix(transform)), 
 	m_NormalMatrix(glm::transpose(glm::inverse(glm::mat3(m_Transform))))
 {
@@ -74,6 +81,43 @@ void Engine::Object::OnDraw()
 	m_Material.shader->SetUniform1i("u_Material.specular", m_Material.specular[0]);
 	m_Material.shader->SetUniform1i("u_Material.normal", m_Material.normal[0]);
 	m_Material.shader->SetUniform1i("u_Material.shininess", m_Material.shininess);
+}
+
+Engine::Object& Engine::Object::operator()(const Vertex* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t indexCount, std::string& assetDirectory, const Transform& transform)
+{
+	m_VertexCount = vertexCount;
+	m_IndexCount = indexCount;
+	m_AssetDirectory = assetDirectory;
+	m_Transform = GenerateModelMatrix(transform);
+	m_NormalMatrix = glm::transpose(glm::inverse(glm::mat3(m_Transform)));
+	
+	m_VAO.Bind();
+	
+	m_VBO.Bind();
+	m_VBO.SetBufferData(sizeof(Vertex) * vertexCount, vertices, GL_STATIC_DRAW);
+	
+	m_IBO.Bind();
+	m_IBO.SetBufferData(sizeof(uint32_t) * indexCount, indices, GL_STATIC_DRAW);
+
+	VertexAttribArray::Enable(0);
+	VertexAttribArray::Enable(1);
+	VertexAttribArray::Enable(2);
+	VertexAttribArray::Enable(3);
+	VertexAttribArray::Enable(4);
+	VertexAttribArray::Enable(5);
+	VertexAttribArray::Enable(6);
+	
+	VertexAttribArray::SetPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), offsetof(Vertex, pos));
+	VertexAttribArray::SetPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), offsetof(Vertex, texCoord));
+	VertexAttribArray::SetPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), offsetof(Vertex, textureSlot));
+	VertexAttribArray::SetPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), offsetof(Vertex, normal));
+	VertexAttribArray::SetPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), offsetof(Vertex, color));
+	VertexAttribArray::SetPointer(5, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), offsetof(Vertex, tangent));
+	VertexAttribArray::SetPointer(6, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), offsetof(Vertex, bitangent));
+
+	m_VAO.Unbind();
+	
+	return *this;
 }
 
 void Engine::Object::Destroy()

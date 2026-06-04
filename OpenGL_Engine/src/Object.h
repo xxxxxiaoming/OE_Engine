@@ -27,6 +27,8 @@ namespace Engine
 		bool m_Cleared = false;
 		bool m_EnableLight = false;
 		
+		BlendMode m_BlendMode = BlendMode::Opaque;
+		
 		glm::mat4 m_Transform;
 		glm::mat3 m_NormalMatrix;
 	public:
@@ -38,7 +40,8 @@ namespace Engine
 		std::vector<Texture> m_TextureSpecular;
 		std::vector<Texture> m_TextureNormal;
 		
-		Object(const Vertex* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t indexCount, std::string& assetDirectory, const Transform& transform = Transform{});
+		Object();
+		Object(const Vertex* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t indexCount, std::string& assetDirectory, const Transform& transform = Transform{}, BlendMode blendMode = BlendMode::Opaque);
 		~Object();
 
 		void OnDraw();
@@ -47,6 +50,8 @@ namespace Engine
 
 		void EnableLight() { m_EnableLight = true; }
 		void DisableLight() { m_EnableLight = false; }
+		
+		Object& operator()(const Vertex* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t indexCount, std::string& assetDirectory, const Transform& transform = Transform{});
 
 		VertexArrayBuffer& GetVAO() { return m_VAO; }
 		VertexBuffer& GetVBO() { return m_VBO; }
@@ -55,11 +60,23 @@ namespace Engine
 		uint32_t GetVertexCount() const { return m_VertexCount; }
 		glm::mat4 GetTransform() const { return m_Transform; }
 		glm::mat3 GetNormalMatrix() const { return m_NormalMatrix; }
+		BlendMode GetBlendMode() const { return m_BlendMode; }
 		
 		void SetTransform(const Transform& transform)
 		{
 			m_Transform = GenerateModelMatrix(transform);
 			m_NormalMatrix = glm::transpose(glm::inverse(glm::mat3(m_Transform)));
+		}
+		
+		void SetTransform(const glm::mat4& transform)
+		{
+			m_Transform = transform;
+			m_NormalMatrix = glm::transpose(glm::inverse(glm::mat3(m_Transform)));
+		}
+		
+		void SetBlendMode(BlendMode blendMode)
+		{
+			m_BlendMode = blendMode;
 		}
 	};
 }

@@ -1,9 +1,5 @@
 #version 460 core
 
-/* Attention pls! */
-/* Gamma correction won't be done in this shader. */
-/* Make sure it samples from texture that gamma correction has been done. */
-
 uniform sampler2D u_Diffuse;
 uniform float u_Exposure;
 uniform bool u_HDR;

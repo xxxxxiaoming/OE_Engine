@@ -4,7 +4,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-float exposure = 1.5f;
+#define USE_DEFERRED_RENDERING
+
+float exposure = 1.0f;
 static void ProcessInput(Engine::Renderer& renderer, float deltaTime)
 {
 	if (glfwGetKey(const_cast<GLFWwindow*>(renderer.GetGLFWwinow()), GLFW_KEY_1) == GLFW_PRESS)
@@ -38,17 +40,25 @@ static void ConfigPhongLight(Engine::PhongLight& phongLight, const Engine::vec3&
 	phongLight.ConfigDirectionLight(
 		Engine::vec3{-1.0f, -1.0f, -1.0f},
 		Engine::vec3{0.02f,0.02f,0.02f},
-		Engine::vec3{7.7f,7.7f,7.7f},
-		Engine::vec3{0.01f,0.01f,0.01f}
+		Engine::vec3{4.7f,4.7f,4.7f},
+		Engine::vec3{0.1f,0.1f,0.11f}
 		);
 	
-	phongLight.AddPointLight(
-		pointLightWorldPosition, 
-		Engine::vec3{0.1f, 0.1f, 0.1f}, 
-		Engine::vec3{17.17f,17.17f,17.77f},
-		Engine::vec3{5.5f, 5.5f, 5.5f},
-		1.0f, 0.001f, 0.0001f
-		);															// 使用1个点光源
+	// phongLight.AddPointLight(
+	// 	pointLightWorldPosition, 
+	// 	Engine::vec3{0.1f, 0.1f, 0.1f}, 
+	// 	Engine::vec3{1.7f,1.7f,1.7f},
+	// 	Engine::vec3{0.1f, 0.1f, 0.1f},
+	// 	1.0f, 0.001f, 0.0001f
+	// 	);															// 使用2个点光源
+	
+	// phongLight.AddPointLight(
+	// 	Engine::vec3{pointLightWorldPosition.x + 10.0f, pointLightWorldPosition.y, pointLightWorldPosition.z},
+	// 	Engine::vec3{0.1f, 0.1f, 0.1f}, 
+	// 	Engine::vec3{7.17f,5.0f,5.0f},
+	// 	Engine::vec3{5.5f, 5.5f, 5.5f},
+	// 	1.0f, 0.001f, 0.0001f
+	// 	);
 	
 	// glm::vec3 cameraWorldPosition = camera.GetPosition();
 	// glm::vec3 cameraLookDirection = camera.GetFront();
@@ -82,8 +92,8 @@ void GenerateRocksModelMatrices(int amount, float minOrbitRadius, float maxOrbit
 void AdvancedLighting(Engine::Renderer& renderer)
 {
 	/* Camera and controller */
-	glm::vec3 camPostion = glm::vec3(0.0f, 200.0f, 0.0f);
-	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 0.0f, -100.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
+	glm::vec3 camPostion = glm::vec3(0.0f, 100.0f, 170.0f);
+	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 55.0f, -100.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
 	Engine::CameraController camController{ renderer.GetGLFWwinow(), 100.0f, 40.0f };
 	
 	/* HDR render target */
@@ -119,7 +129,7 @@ void AdvancedLighting(Engine::Renderer& renderer)
 	camController.PossessCamera(&cam);
 	
 	/* Phong Light */
-	Engine::PhongLight phongLight;
+	Engine::PhongLight phongLight{1024, true};
 	Engine::vec3 pointLightPosition{-70.0f, 70.0f, -50.0f};
 	ConfigPhongLight(phongLight, pointLightPosition, cam);
 	
@@ -127,7 +137,7 @@ void AdvancedLighting(Engine::Renderer& renderer)
 	glm::vec3 shadowMapCamLookAt = glm::vec3(0.0f, 0.0f, -70.0f); // 精准瞄准 Nanosuit
 	glm::vec3 shadowMapCaptureCamPos = shadowMapCamLookAt + glm::vec3(150.0f, 150.0f, 150.0f); // 把光源相机拉近
 	
-	phongLight.DisableDirectionLight();
+	// phongLight.DisableDirectionLight();
 
 	// 将投影矩阵的宽高大幅度缩小到 300x300，让 1024 贴图的像素密度暴增！
 	phongLight.ConfigShadowMapCaptureView(
@@ -137,13 +147,13 @@ void AdvancedLighting(Engine::Renderer& renderer)
 		-150.0f, 150.0f, // Bottom, Top (高度缩减到300)
 		0.1f, 500.0f    // Near, Far
 	);
-	phongLight.ConfigShadowMapPointCaptureView(
-		0,
-		glm::vec3{pointLightPosition.x, pointLightPosition.y, pointLightPosition.z},
-		90,
-		1.0,
-		0.1f, 2000.0f
-	);
+	// phongLight.ConfigShadowMapPointCaptureView(
+	// 	0,
+	// 	glm::vec3{pointLightPosition.x, pointLightPosition.y, pointLightPosition.z},
+	// 	90,
+	// 	1.0,
+	// 	0.1f, 2000.0f
+	// );
 	
 	constexpr float sizeX = 2000.0f;
 	constexpr float sizeY = 2000.0f;
@@ -183,7 +193,7 @@ void AdvancedLighting(Engine::Renderer& renderer)
 	floor.m_TextureSpecular.reserve(1);
 	floor.m_TexturesAmbient.emplace_back("res/texture/brickwall.jpg");
 	floor.m_TexturesDiffuse.emplace_back("res/texture/brickwall.jpg");
-	floor.m_TextureSpecular.emplace_back("res/texture/default_specular.jpg");
+	floor.m_TextureSpecular.emplace_back(0xFF000000);
 	floor.m_TextureNormal.emplace_back("res/texture/brickwall_normal.jpg");
 	
 	int floorDiffuseSlot[1] = {1};
@@ -194,12 +204,13 @@ void AdvancedLighting(Engine::Renderer& renderer)
 	floor.m_Material.BindSpecularSlots(floorSpecularSlot, 1);
 	floor.m_Material.BindNormalSlots(floorNormalSlot, 1);
 	floor.EnableLight();
+	floor.SetBlendMode(Engine::BlendMode::Opaque);
 	
 	phongLight.AddObject("floor", &floor);
 	
 	Engine::Transform nanosuitTransform = {
 		glm::vec3(10.0f, 10.0f, 10.0f),
-		glm::vec3(0.0f, 30.0f, -70.0f),
+		glm::vec3(0.0f, 20.0f, -70.0f),
 		glm::vec3(0.0f, 0.0f, 0.0f),
 	};
 	Engine::Model nanoSuit{"res/assets/backpack/backpack.obj", true
@@ -254,9 +265,11 @@ void AdvancedLighting(Engine::Renderer& renderer)
 			renderer.OnRender();
 		
 			matForRect.UseMaterial();
-			uint32_t texture = renderTargetHDR.GetTextureBuffer();
-			glBindTextureUnit(0, texture);
-		
+			// uint32_t texture = renderTargetHDR.GetTextureBuffer();
+			uint32_t texture = phongLight.GetFinalRenderTarget().GetTextureBuffer();
+			glBindTextureUnit(10, texture);
+			
+			shaderRect.SetUniform1i("u_Diffuse", 10);
 			shaderRect.SetUniform1f("u_Exposure", exposure);
 			rectObj.OnDraw();
 			renderer.DrawElements(rectObj.GetIndexCount(), nullptr);
@@ -273,7 +286,6 @@ void AdvancedLighting(Engine::Renderer& renderer)
 		
 			renderer.Render();
 		}
-		
 	}
 }
 

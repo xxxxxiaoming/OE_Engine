@@ -72,21 +72,21 @@ void Engine::RenderTarget::CreateDepthCubeAttachment()
 	GLCALL(glBindTexture(GL_TEXTURE_CUBE_MAP, 0));
 }
 
-void Engine::RenderTarget::CreateColorAttachment()
+void Engine::RenderTarget::CreateColorAttachment(uint32_t slot, uint32_t format)
 {
 	GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, m_FBO));
 	
-	GLCALL(glGenTextures(1, &m_ColorAttachment));
-	GLCALL(glBindTexture(GL_TEXTURE_2D, m_ColorAttachment));
+	GLCALL(glGenTextures(1, &m_ColorAttachments[slot]));
+	GLCALL(glBindTexture(GL_TEXTURE_2D, m_ColorAttachments[slot]));
 	
-	GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
-	GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+	GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+	GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
 	
-	uint16_t innerFormat = m_bEnableHDR ? GL_RGB16F : GL_RGBA;
+	uint16_t innerFormat = m_bEnableHDR ? (format == GL_RGB ? GL_RGB16F : GL_RGBA16F) : (format == GL_RGB ? GL_RGB : GL_RGBA);
 	uint16_t dataType = m_bEnableHDR ? GL_FLOAT : GL_UNSIGNED_BYTE;
 	
-	GLCALL(glTexImage2D(GL_TEXTURE_2D, 0, innerFormat, m_Width, m_Height, 0, GL_RGB, dataType, nullptr));
-	GLCALL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_ColorAttachment, 0));
+	GLCALL(glTexImage2D(GL_TEXTURE_2D, 0, innerFormat, m_Width, m_Height, 0, format, dataType, nullptr));
+	GLCALL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + slot, GL_TEXTURE_2D, m_ColorAttachments[slot], 0));
 	GLCALL(glBindTexture(GL_TEXTURE_2D, 0));
 	
 	GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
@@ -118,6 +118,19 @@ void Engine::RenderTarget::CreateRenderBuffer()
 	GLCALL(glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, m_Width, m_Height ));
 	GLCALL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, m_RenderBuffer ));
 	GLCALL(glBindRenderbuffer(GL_RENDERBUFFER, 0));
+	GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+}
+
+void Engine::RenderTarget::UseMultiColorAttachments(const uint32_t* attachments, const size_t size) const
+{
+	GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, m_FBO));
+	
+	std::vector<uint32_t>colorAttachments;
+	colorAttachments.reserve(size);
+	for (size_t i = 0; i < size; ++i)
+		colorAttachments.emplace_back(GL_COLOR_ATTACHMENT0 + attachments[i]);
+	
+	GLCALL(glDrawBuffers(size, colorAttachments.data()));
 	GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 }
 
@@ -202,8 +215,17 @@ void Engine::RenderTarget::SaveDepthCubeAttachment(const std::string& path) cons
 
 void Engine::RenderTarget::DeleteFrameBuffer()
 {
-	if (m_ColorAttachment != 0)
-		GLCALL(glDeleteTextures(1, &m_ColorAttachment));
+	if (!m_ColorAttachments.empty())
+	{
+		for (size_t i = 0; i < m_ColorAttachments.size(); ++i)
+		{
+			if (m_ColorAttachments[i] != 0)
+			{
+				GLCALL(glDeleteTextures(1, &m_ColorAttachments[i]));
+				m_ColorAttachments[i] = 0;
+			}
+		}
+	}
 	
 	if (m_DepthStencilAttachment != 0)
 		GLCALL(glDeleteTextures(1, &m_DepthStencilAttachment));
@@ -214,7 +236,6 @@ void Engine::RenderTarget::DeleteFrameBuffer()
 	if (m_FBO != 0)
 		GLCALL(glDeleteFramebuffers(1, &m_FBO));
 	
-	m_ColorAttachment = 0;
 	m_DepthStencilAttachment = 0;
 	m_RenderBuffer = 0;
 	m_FBO = 0;

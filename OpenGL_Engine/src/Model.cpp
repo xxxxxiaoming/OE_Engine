@@ -9,6 +9,40 @@
 #include "Material.h"
 #include "Type.h"
 
+static Engine::BlendMode ProcessMeshBlendMode(const aiMaterial* material)
+{
+	aiString aiModeString;
+	if (material->Get("$mat.gltf.alphaMode", 0, 0, aiModeString) == AI_SUCCESS)
+	{
+		if (std::strcmp(aiModeString.C_Str(), "BLEND") == 0)
+			return Engine::BlendMode::Transparent;
+		else if (std::strcmp(aiModeString.C_Str(), "MASK") == 0)
+			return Engine::BlendMode::Masked;
+		else
+			return Engine::BlendMode::Opaque;
+	}
+	
+	float opacity = 1.0f;
+	if (material->Get(AI_MATKEY_OPACITY, opacity) == AI_SUCCESS)
+	{
+		if (opacity < 1.0f)
+			return Engine::BlendMode::Transparent;
+		else
+			return Engine::BlendMode::Opaque;
+	}
+	
+	int blendMode = 0;
+	if (material->Get(AI_MATKEY_BLEND_FUNC, blendMode) == AI_SUCCESS)
+	{
+		if (blendMode == aiBlendMode_Additive)
+			return Engine::BlendMode::Transparent;
+		else
+			return Engine::BlendMode::Opaque;
+	}
+	
+	return Engine::BlendMode::Opaque;
+}
+
 Engine::Part::Part(const aiNode* node, const aiScene* scene, uint8_t indicesOfOneFace, std::string& assetDirectory, std::string& format) :
 	indicesPerFace(indicesOfOneFace)
 {
@@ -176,6 +210,8 @@ void Engine::Part::ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& 
 	{
 		// TODO : Deal with other formats
 	}
+	
+	object.SetBlendMode(ProcessMeshBlendMode(material));
 
 	std::free(vertices);
 	std::free(indices);

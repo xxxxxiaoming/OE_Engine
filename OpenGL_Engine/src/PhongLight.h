@@ -14,31 +14,46 @@ namespace  Engine
     class PhongLight
     {
     private:
-        Shader m_Shader;
+        Shader m_ShaderLight;
+        Shader m_ShaderLightForward;
+        Shader m_ShaderGBuffer;
         ShadowMapDirection m_ShadowMap;
         std::vector<ShadowMapPoint>  m_ShadowMapPoint;
         int m_PointLightIndex = 0;
         int m_SpotLightIndex = 0;
         
-        std::unordered_map<std::string, Model*> m_Models;
-        std::unordered_map<std::string, Object*> m_Objects;
         bool m_ShadowMapCaptured = false;
+        bool m_UseDeffered = false;
         
         int m_ShadowMapResolution = 1024;
         std::vector<bool> m_PointLightsNeedCapture;
         
+        std::unordered_map<std::string, Model*> m_Models;
+        std::unordered_map<std::string, Object*> m_Objects;
+        
+        std::unordered_map<std::string, Object*> m_OpaqueObjects;
+        std::unordered_map<std::string, Object*> m_MaskedObjects;
+        std::unordered_map<std::string, Object*> m_TransparentObjects;
+        
+        RenderTarget m_RTGbuffer;
+        RenderTarget m_RTLight;
+        Object m_RenderRect;
+        
         void BlockModelInternal(Model* model) {model->BindShader(nullptr); model->DisableLight();}
         void BlockObjectInternal(Object* object) {object->m_Material.BindShader(nullptr);object->DisableLight();}
-        void UnblockModelInternal(Model* model) {model->BindShader(&m_Shader);model->EnableLight();}
-        void UnblockObjectInternal(Object* object) {object->m_Material.BindShader(&m_Shader);object->EnableLight();}
+        void UnblockModelInternal(Model* model);
+        void UnblockObjectInternal(Object* object);
         void GenerateShadowMapInternal(Renderer& renderer);
         void GenerateShadowMapPointInternal(Renderer& renderer);
         void GenerateSpecificShadowMapPointInternal(int index, Renderer& renderer);
+        void ForwardRenderInternal(const Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
+        void DefferedRenderInternal(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
     public:
-        PhongLight(int shadowMapResolution = 1024);
+        PhongLight(int shadowMapResolution = 1024, bool bDeffered = false);
         
-        void TurnOn(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
-        void TurnOff(Renderer& renderer) const;
+        virtual void TurnOn(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
+        virtual void TurnOff(Renderer& renderer) const;
+        
         
         void ConfigDirectionLight(const vec3& direction, const vec3& ambient, const vec3& diffuse, const vec3& specular);
         void EnableDirectionLight();
@@ -68,5 +83,7 @@ namespace  Engine
         
         void RemoveModel(const std::string& name);
         void RemoveObject(const std::string& name);
+        
+        RenderTarget& GetFinalRenderTarget() { return m_RTLight;}
     };
 }

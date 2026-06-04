@@ -12,8 +12,9 @@ namespace Engine
 		int m_Width;
 		int m_Height;
 		
+		std::vector<uint32_t> m_ColorAttachments{0,0,0,0,0};
+		
 		uint32_t m_FBO = 0;
-		uint32_t m_ColorAttachment = 0;
 		uint32_t m_DepthAttachment = 0;
 		uint32_t m_DepthCubeAttachment = 0;
 		uint32_t m_DepthStencilAttachment = 0;
@@ -24,7 +25,7 @@ namespace Engine
 		RenderTarget(int width, int height, bool bEnableHDR = false);
 		~RenderTarget();
 
-		void CreateColorAttachment();
+		void CreateColorAttachment(uint32_t slot = 0, uint32_t format = GL_RGB);
 		void CreateDepthAttachment();
 		void CreateDepthCubeAttachment();
 		void CreateDepthStencilAttachment();
@@ -32,6 +33,8 @@ namespace Engine
 		
 		void BindFramebuffer() const {GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, m_FBO));}
 		void UnbindFramebuffer() const {GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));}
+		
+		void UseMultiColorAttachments(const uint32_t* attachments, const size_t size) const;
 		
 		void SaveColorAttachment(const std::string& path) const;
 		void SaveDepthAttachment(const std::string& path) const;
@@ -45,7 +48,9 @@ namespace Engine
 			GLCALL(glReadBuffer(GL_NONE));
 			GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 		}
-		uint32_t GetTextureBuffer() const {return m_ColorAttachment;}
+		
+		uint32_t GetFBO() const { return m_FBO; }
+		uint32_t GetTextureBuffer(int slot = 0) const {return m_ColorAttachments[slot];}
 		uint32_t GetDepthBuffer() const {return m_DepthAttachment;}
 		uint32_t GetCubeDepthBuffer() const {return m_DepthCubeAttachment;}
 		

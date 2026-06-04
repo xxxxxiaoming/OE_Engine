@@ -21,6 +21,13 @@ namespace Engine
 		LookRight,
 	};
 	
+	enum class BlendMode
+	{
+		Opaque,
+		Masked,
+		Transparent,
+	};
+	
 	enum class TextureType
 	{
 		DIFFUSE, SPECULAR, NORMAL, NONE
