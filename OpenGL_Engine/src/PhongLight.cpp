@@ -1,4 +1,3 @@
-#include <sstream>
 #include "PhongLight.h"
 
 #include <filesystem>
@@ -7,8 +6,53 @@
 #include "PLFS.h"
 #include "PLFSDR.h"
 #include "PLVSDR.h"
+#include "PLFS_SSAO.h"
+#include "Random.h"
 
 static const int MAX_NON_DIRECTIONAL_LIGHTS = 4;
+static const int SSAO_SAMPLES_NUMBER = 64;
+static const int SSAO_NOISE_NUMBER = 16;
+
+static void GenerateSSAOSamples(std::vector<glm::vec3>& samples, uint32_t& noiseTexture)
+{
+    auto func = [](int i)->float
+    {
+        float scale = static_cast<float>(i) / SSAO_SAMPLES_NUMBER;
+        scale = 0.1f + scale * scale * (1.0f - 0.1f);
+        return scale;
+    }; 
+    samples.reserve(SSAO_SAMPLES_NUMBER);
+    Engine::Random::Init();
+    for(int count = 0; count < SSAO_SAMPLES_NUMBER; count++)
+    {
+        glm::vec3 sample{
+            Engine::Random::Float(-1.0f, 1.0f),
+            Engine::Random::Float(-1.0f, 1.0f),
+            Engine::Random::Float(0.0f, 1.0f)
+        }; // sample 这时候是一个[-1,1] * [-1,1] * [0,1]的长方体
+        
+        sample = glm::normalize(sample); // 这个时候才是一个（半径为1）半球体哦。
+        float scale = func(count);
+        samples.emplace_back(sample * scale);
+    }
+    
+    std::vector<glm::vec3> noise;
+    noise.reserve(SSAO_NOISE_NUMBER);
+    
+    for (size_t count = 0; count < SSAO_NOISE_NUMBER; count++)
+    {
+        noise.emplace_back(Engine::Random::Float(-1.0f, 1.0f), Engine::Random::Float(-1.0f, 1.0f), Engine::Random::Float(-1.0f, 1.0f));
+    }
+    
+    GLCALL(glGenTextures(1, &noiseTexture));
+    GLCALL(glBindTexture(GL_TEXTURE_2D, noiseTexture));
+    GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+    GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+    GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));
+    GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
+    GLCALL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 4, 4, 0, GL_RGB, GL_FLOAT, noise.data()));
+    GLCALL(glBindTexture(GL_TEXTURE_2D, 0));
+}
 
 void Engine::PhongLight::UnblockModelInternal(Model* model)
 {
@@ -122,11 +166,11 @@ void Engine::PhongLight::ForwardRenderInternal(const Renderer& renderer, const g
     m_RTLight.UnbindFramebuffer();
 }
 
-void Engine::PhongLight::DefferedRenderInternal(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
+void Engine::PhongLight::DeferredRenderInternal(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
 {
     // Generate g-buffer
     m_ShaderGBuffer.Use();
-    m_RTGbuffer.BindFramebuffer();
+    m_RTGBuffer.BindFramebuffer();
     
     renderer.OnRender();
     renderer.DisableBlend();
@@ -148,34 +192,69 @@ void Engine::PhongLight::DefferedRenderInternal(Renderer& renderer, const glm::m
     renderer.EnableBlend();
     
     m_ShaderGBuffer.UnUse();
-    m_RTGbuffer.UnbindFramebuffer();
+    m_RTGBuffer.UnbindFramebuffer();
     
-    // Generate final frame
-    m_ShaderLight.Use();
-    m_RTLight.BindFramebuffer();
-    
-    uint32_t positionBuffer = m_RTGbuffer.GetTextureBuffer(0);
-    uint32_t lightSpacePosBuffer = m_RTGbuffer.GetTextureBuffer(1);
-    uint32_t normalBuffer = m_RTGbuffer.GetTextureBuffer(2);
-    uint32_t albedoSpecBuffer = m_RTGbuffer.GetTextureBuffer(3);
+    uint32_t positionBuffer = m_RTGBuffer.GetTextureBuffer(0);
+    uint32_t lightSpacePosBuffer = m_RTGBuffer.GetTextureBuffer(1);
+    uint32_t normalBuffer = m_RTGBuffer.GetTextureBuffer(2);
+    uint32_t albedoSpecBuffer = m_RTGBuffer.GetTextureBuffer(3);
     
     GLCALL(glBindTextureUnit(6, positionBuffer));
     GLCALL(glBindTextureUnit(7, lightSpacePosBuffer));
     GLCALL(glBindTextureUnit(8, normalBuffer));
     GLCALL(glBindTextureUnit(9, albedoSpecBuffer));
     
-    m_ShaderLight.SetUniform1i("u_PositionMap", 6);
-    m_ShaderLight.SetUniform1i("u_DLightSpacePositionMap", 7);
-    m_ShaderLight.SetUniform1i("u_NormalMap", 8);
-    m_ShaderLight.SetUniform1i("u_AlbedoSpecMap", 9);
+    m_ShaderSSAO.Use();
+    m_RTSSAO.BindFramebuffer();
+    
+    m_ShaderSSAO.SetUniform1i("u_PositionMap", 6);
+    m_ShaderSSAO.SetUniform1i("u_NormalMap", 8);
     
     renderer.OnRender();
-    // renderer.DisableDepthTest();
     
     m_RenderRect.OnDraw();
     
     renderer.DrawElements(m_RenderRect.GetIndexCount(), nullptr);
-    // renderer.EnableDepthTest();
+    
+    m_ShaderSSAO.UnUse();
+    m_RTSSAO.UnbindFramebuffer();
+    
+    m_ShaderSSAOSmoth.Use();
+    m_RTSSAOSmoth.BindFramebuffer();
+    
+    uint32_t ssaoTexture = m_RTSSAO.GetTextureBuffer();
+    
+    GLCALL(glBindTextureUnit(10, ssaoTexture));
+    m_ShaderSSAOSmoth.SetUniform1i("u_SSAOMap", 10);
+    
+    renderer.OnRender();
+    
+    m_RenderRect.OnDraw();
+    
+    renderer.DrawElements(m_RenderRect.GetIndexCount(), nullptr);
+    
+    
+    m_ShaderSSAOSmoth.UnUse();
+    m_RTSSAOSmoth.UnbindFramebuffer();
+    
+    uint32_t ssaoSmoothTexture = m_RTSSAOSmoth.GetTextureBuffer();
+    GLCALL(glBindTextureUnit(10, ssaoSmoothTexture));
+    
+    // Generate final frame
+    m_ShaderLight.Use();
+    m_RTLight.BindFramebuffer();
+
+    m_ShaderLight.SetUniform1i("u_PositionMap", 6);
+    m_ShaderLight.SetUniform1i("u_DLightSpacePositionMap", 7);
+    m_ShaderLight.SetUniform1i("u_NormalMap", 8);
+    m_ShaderLight.SetUniform1i("u_AlbedoSpecMap", 9);
+    m_ShaderLight.SetUniform1i("u_SSAOMap", 10);
+    
+    renderer.OnRender();
+    
+    m_RenderRect.OnDraw();
+    
+    renderer.DrawElements(m_RenderRect.GetIndexCount(), nullptr);
     
     m_ShaderLight.UnUse();
     m_RTLight.UnbindFramebuffer();
@@ -185,8 +264,10 @@ Engine::PhongLight::PhongLight(int shadowMapResolution, bool bDeffered) :
     m_ShadowMap(shadowMapResolution, false),
     m_UseDeffered(bDeffered),
     m_ShadowMapResolution(shadowMapResolution),
-    m_RTGbuffer(1270, 740, true),
-    m_RTLight(1270, 740, true)
+    m_RTGBuffer(1280, 720, true),
+    m_RTLight(1280, 720, true),
+    m_RTSSAO(1280, 720, true),
+    m_RTSSAOSmoth(1280, 720, true)
 {
     m_ShadowMapPoint.reserve(MAX_NON_DIRECTIONAL_LIGHTS);
     m_PointLightsNeedCapture.reserve(MAX_NON_DIRECTIONAL_LIGHTS);
@@ -200,13 +281,29 @@ Engine::PhongLight::PhongLight(int shadowMapResolution, bool bDeffered) :
     m_ShaderLightForward.CreateShaderFromSource(vsShaderCode, fsShaderCode);
     m_ShaderLight.CreateShaderFromSource(vsShaderCodeLight, fsShaderCodeLight);
     m_ShaderGBuffer.CreateShaderFromSource(vsShaderCodeDR, fsShaderCodeDR);
+    m_ShaderSSAO.CreateShaderFromSource(vsShaderCodeLight, fsSSAOCode);
+    m_ShaderSSAOSmoth.CreateShaderFromSource(vsShaderCodeLight, fsSSAOBlurCode);
+    
+    int resolution[2] = {1280, 720};
+    std::vector<glm::vec3> samples;
+    GenerateSSAOSamples(samples, m_SSAONoiseTexture);
+    GLCALL(glBindTextureUnit(11, m_SSAONoiseTexture));
+    m_ShaderSSAO.SetUniform3fv("u_Samples", samples.size(), samples.data());
+    m_ShaderSSAO.SetUniform1iv("u_Resolution", 2, resolution);
+    m_ShaderSSAO.SetUniform1i("u_NoiseMap", 11);
         
-    m_RTGbuffer.CreateColorAttachment(0);
-    m_RTGbuffer.CreateColorAttachment(1);
-    m_RTGbuffer.CreateColorAttachment(2);
-    m_RTGbuffer.CreateColorAttachment(3, GL_RGBA);
-    m_RTGbuffer.CreateRenderBuffer();
-    m_RTGbuffer.UseMultiColorAttachments(colorAttachments, 4);
+    m_RTGBuffer.CreateColorAttachment(0);
+    m_RTGBuffer.CreateColorAttachment(1);
+    m_RTGBuffer.CreateColorAttachment(2);
+    m_RTGBuffer.CreateColorAttachment(3, GL_RGBA);
+    m_RTGBuffer.CreateRenderBuffer();
+    m_RTGBuffer.UseMultiColorAttachments(colorAttachments, 4);
+    
+    m_RTSSAO.CreateColorAttachment(0, GL_RGB);
+    m_RTSSAO.CreateRenderBuffer();
+    
+    m_RTSSAOSmoth.CreateColorAttachment(0, GL_RGB);
+    m_RTSSAOSmoth.CreateRenderBuffer();
         
     m_RTLight.CreateColorAttachment(0);
     m_RTLight.CreateRenderBuffer();
@@ -269,11 +366,11 @@ void Engine::PhongLight::TurnOn(Renderer& renderer, const glm::mat4& viewMatrix,
     GLCALL(glBindTextureUnit(5, shadowMap));
     m_ShaderLight.SetUniform1i("u_ShadowDepthMap", 5);
 
-    DefferedRenderInternal(renderer, viewMatrix, projectionMatrix);
+    DeferredRenderInternal(renderer, viewMatrix, projectionMatrix);
     
-    GLCALL(glBindFramebuffer(GL_READ_FRAMEBUFFER, m_RTGbuffer.GetFBO()));
+    GLCALL(glBindFramebuffer(GL_READ_FRAMEBUFFER, m_RTGBuffer.GetFBO()));
     GLCALL(glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_RTLight.GetFBO()));
-    GLCALL(glBlitFramebuffer(0, 0, 1270, 740, 0, 0, 1270, 740, GL_DEPTH_BUFFER_BIT, GL_NEAREST));
+    GLCALL(glBlitFramebuffer(0, 0, 1280, 720, 0, 0, 1280, 720, GL_DEPTH_BUFFER_BIT, GL_NEAREST));
     GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
     
     ForwardRenderInternal(renderer, viewMatrix, projectionMatrix);
@@ -552,7 +649,13 @@ void Engine::PhongLight::ConfigMVPMatrix(const glm::mat4& modelMatrix, const glm
     
     m_ShaderLightForward.SetUniformMatrix4f("u_Model", modelMatrix);
     m_ShaderLightForward.SetUniformMatrix4f("u_View", viewMatrix);
-    m_ShaderLightForward.SetUniformMatrix4f("u_Projection", projectionMatrix);   
+    m_ShaderLightForward.SetUniformMatrix4f("u_Projection", projectionMatrix);
+    
+    if (!m_ShaderSSAO.CheckShaderValidity())
+        return;
+    
+    m_ShaderSSAO.SetUniformMatrix4f("u_View", viewMatrix);
+    m_ShaderSSAO.SetUniformMatrix4f("u_Projection", projectionMatrix);
 }
 
 void Engine::PhongLight::ConfigNormalMatrix(const glm::mat3& normalMatrix)

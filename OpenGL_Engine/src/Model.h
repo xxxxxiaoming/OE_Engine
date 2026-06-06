@@ -44,8 +44,11 @@ namespace Engine
 	public:
 		uint32_t m_VBOIntanced = 0;
 		
+		Model();
 		Model(const std::string& path, bool FlipUV = true, const Transform& transform = Transform());
 		~Model();
+		
+		Model& operator()(const std::string& path, bool bFlipUV = true, const Transform& transform = Transform());
 
 		void Destroy();
 

@@ -4,7 +4,7 @@
 // language=GLSL
 static const char fsShaderCodeDR[] = R"glsl(
 #version 460 core
-layout (location = 0) out vec3 gPosition;               // 世界坐标
+layout (location = 0) out vec3 gPosition;          // 世界坐标 + （线性）深度
 layout (location = 1) out vec3 gLightSpacePosition;     // NDC坐标
 layout (location = 2) out vec3 gN;
 layout (location = 3) out vec4 gAlbedoSpec;
@@ -18,6 +18,8 @@ struct Material {
 };
 
 uniform Material u_Material;
+uniform float u_NearPlane;
+uniform float u_FarPlane;
 
 in vec2 v_TexCoord;
 in vec3 v_FragPosition;
@@ -43,8 +45,14 @@ mat3 correctionTBN(vec3 v_T, vec3 v_B, vec3 v_N)
     return TBN;
 }
 
+//float linearDepth(float depth)
+//{
+//    depth = depth * 2.0 - 1.0;
+//    return (2.0 * u_NearPlane * u_FarPlane) / (u_FarPlane + u_NearPlane - depth * (u_FarPlane - u_NearPlane));
+//}
+
 void main() {
-    gPosition = v_FragPosition;
+    gPosition.rgb = v_FragPosition.xyz;
     gLightSpacePosition = v_LightSpacePosition.xyz / v_LightSpacePosition.w;
 
     mat3 TBN = correctionTBN(v_T, v_B, v_N);
@@ -56,21 +64,10 @@ void main() {
     
     gN = normalVec;
     gAlbedoSpec = vec4(texture(u_Material.diffuse, v_TexCoord).rgb, texture(u_Material.specular, v_TexCoord).a);
-
-    // check position
-    // color = vec4(gPosition, 1.0);
-
-    // check normal
-    //color = vec4(normalVec * 0.5 + 0.5, 1.0);
-
-    // check light space position
-    //color = vec4(normalize(gLightSpacePosition) * 0.5 + 0.5, 1.0);
-
-    // check albedo
-    //color = vec4(gAlbedoSpec.rgb, 1.0);
-
-    // check specular
-    //color = vec4(gAlbedoSpec.a, gAlbedoSpec.a, gAlbedoSpec.a, 1.0);
+    
+    // For SSAO testing
+    //gN = normalize(v_N);
+    //gAlbedoSpec = vec4(0.27, 0.27, 0.27, texture(u_Material.specular, v_TexCoord).a);
 }
 )glsl";
 
@@ -137,6 +134,7 @@ uniform sampler2D u_PositionMap;
 uniform sampler2D u_DLightSpacePositionMap;
 uniform sampler2D u_NormalMap;
 uniform sampler2D u_AlbedoSpecMap;
+uniform sampler2D u_SSAOMap;
 uniform sampler2D u_ShadowDepthMap;
 uniform samplerCube u_PointLightsDepthMap[MAX_POINT_OR_SPOT_LIGHT_NUM];
 
@@ -155,7 +153,7 @@ in vec2 v_TexCoord;
 
 out vec4 color;
 
-vec3 calcDirectionLight(vec3 sampleColorAmbient, vec3 sampleColorDiffuse, vec3 sampleColorSpecular)
+vec3 calcDirectionLight(vec3 sampleColorAmbient, vec3 sampleColorDiffuse, vec3 sampleColorSpecular, float ssao)
 {
     if(!u_LightConfig.enableDirectionLight)
         return vec3(0.0);
@@ -193,11 +191,11 @@ vec3 calcDirectionLight(vec3 sampleColorAmbient, vec3 sampleColorDiffuse, vec3 s
     vec3 diffuseLight = u_DirectionLight.color.diffuse * max(dot(normalize(-u_DirectionLight.direction),normal_Normalized), 0.0) * sampleColorDiffuse;
     vec3 specularLight = u_DirectionLight.color.specular * pow(max(dot(lookAtCamera_Normalized, reflect(normalize(u_DirectionLight.direction), normal_Normalized)), 0.0), 8) * sampleColorSpecular * reflectDamping;
 
-    result = ambientLight + diffuseLight * shadowDebuff + specularLight * shadowDebuff;
+    result = ambientLight * ssao + diffuseLight * shadowDebuff + specularLight * shadowDebuff;
     return result;
 }
 
-vec3 calcPointLights(vec3 sampleColorAmbient, vec3 sampleColorDiffuse, vec3 sampleColorSpecular)
+vec3 calcPointLights(vec3 sampleColorAmbient, vec3 sampleColorDiffuse, vec3 sampleColorSpecular, float ssao)
 {
     if(u_LightConfig.pointLightNum <= 0)
         return vec3(0.0);
@@ -246,18 +244,18 @@ vec3 calcPointLights(vec3 sampleColorAmbient, vec3 sampleColorDiffuse, vec3 samp
             shadowDebuff += ((lightDistance - bias < closestDepth) ? 1.0 : 0.0);
         }
         
-       shadowDebuff /= float(samples);
+        shadowDebuff /= float(samples);
 
         vec3 reflectVec = reflect(-normalize(lookAtLight), normal_Normalized);
         vec3 halfWayVec = normalize(lookAtCamera_Normalized + normalize(lookAtLight));
         specular = pow(max(dot(normal_Normalized, halfWayVec), 0.0), 8);
         specularLight = specular * light.color.specular * sampleColorSpecular * reflectDamping;
-        result += ((ambientLight + diffuseLight * shadowDebuff + specularLight * shadowDebuff) * attenuation);
+        result += ((ambientLight * ssao + diffuseLight * shadowDebuff + specularLight * shadowDebuff) * attenuation);
     }
     return result;
 }
 
-vec3 calcSpotLight(vec3 sampleColorAmbient, vec3 sampleColorDiffuse, vec3 sampleColorSpecular)
+vec3 calcSpotLight(vec3 sampleColorAmbient, vec3 sampleColorDiffuse, vec3 sampleColorSpecular, float ssao)
 {
      if(u_LightConfig.spotLightNum <= 0)
         return vec3(0.0);
@@ -270,7 +268,7 @@ vec3 calcSpotLight(vec3 sampleColorAmbient, vec3 sampleColorDiffuse, vec3 sample
      float attenuation = 1.0; // 聚光源随着距离衰减的系数
 
      vec3 diffuseLight = vec3(0.0);
-     vec3 specularLigt = vec3(0.0);
+     vec3 specularLight = vec3(0.0);
      vec3 ambientLight = vec3(0.0);
      vec3 lookAtLight = vec3(0.0);
 
@@ -295,8 +293,8 @@ vec3 calcSpotLight(vec3 sampleColorAmbient, vec3 sampleColorDiffuse, vec3 sample
 
         vec3 reflectVec = reflect(-normalize(lookAtLight), normal_Normalized);
         specular = pow(max(dot(lookAtCamera_Normalized, reflectVec), 0.0), 8);
-        specularLigt = specular * light.color.specular * sampleColorSpecular * reflectDamping;
-        result += ((ambientLight + diffuseLight + specularLigt) * spotFactor * attenuation + (1 - spotFactor) * ambientLight * attenuation);
+        specularLight = specular * light.color.specular * sampleColorSpecular * reflectDamping;
+        result += ((ambientLight * ssao + diffuseLight + specularLight) * spotFactor * attenuation + (1 - spotFactor) * ambientLight * attenuation);
      }
 
      return result;
@@ -314,8 +312,10 @@ void main() {
 
     vec3 light = vec3(0.0, 0.0, 0.0);
 
+    float ssao = texture(u_SSAOMap, v_TexCoord).r;
+
     lookAtCamera_Normalized = normalize(u_CameraPosition - texture(u_PositionMap, v_TexCoord).rgb);
-    light = calcDirectionLight(sampleColorDiffuse, sampleColorDiffuse, sampleColorSpecular) + calcPointLights(sampleColorDiffuse, sampleColorDiffuse, sampleColorSpecular) + calcSpotLight(sampleColorDiffuse, sampleColorDiffuse, sampleColorSpecular);
+    light = calcDirectionLight(sampleColorDiffuse, sampleColorDiffuse, sampleColorSpecular, ssao) + calcPointLights(sampleColorDiffuse, sampleColorDiffuse, sampleColorSpecular, ssao) + calcSpotLight(sampleColorDiffuse, sampleColorDiffuse, sampleColorSpecular, ssao);
     color = vec4(light, 1.0);
 }
 )glsl";

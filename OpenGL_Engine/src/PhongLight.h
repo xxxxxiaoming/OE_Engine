@@ -17,6 +17,8 @@ namespace  Engine
         Shader m_ShaderLight;
         Shader m_ShaderLightForward;
         Shader m_ShaderGBuffer;
+        Shader m_ShaderSSAO;
+        Shader m_ShaderSSAOSmoth;
         ShadowMapDirection m_ShadowMap;
         std::vector<ShadowMapPoint>  m_ShadowMapPoint;
         int m_PointLightIndex = 0;
@@ -35,9 +37,13 @@ namespace  Engine
         std::unordered_map<std::string, Object*> m_MaskedObjects;
         std::unordered_map<std::string, Object*> m_TransparentObjects;
         
-        RenderTarget m_RTGbuffer;
+        RenderTarget m_RTGBuffer;
         RenderTarget m_RTLight;
+        RenderTarget m_RTSSAO;
+        RenderTarget m_RTSSAOSmoth;
         Object m_RenderRect;
+        
+        uint32_t m_SSAONoiseTexture = 0;
         
         void BlockModelInternal(Model* model) {model->BindShader(nullptr); model->DisableLight();}
         void BlockObjectInternal(Object* object) {object->m_Material.BindShader(nullptr);object->DisableLight();}
@@ -47,7 +53,7 @@ namespace  Engine
         void GenerateShadowMapPointInternal(Renderer& renderer);
         void GenerateSpecificShadowMapPointInternal(int index, Renderer& renderer);
         void ForwardRenderInternal(const Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
-        void DefferedRenderInternal(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
+        void DeferredRenderInternal(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
     public:
         PhongLight(int shadowMapResolution = 1024, bool bDeffered = false);
         

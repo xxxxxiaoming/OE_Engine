@@ -304,6 +304,14 @@ Engine::Part::~Part()
 	}
 }
 
+Engine::Model::Model() :
+	m_ModelPath(""),
+	m_Transform(GenerateModelMatrix(Transform())),
+	m_NormalMatrix(glm::transpose(glm::inverse(glm::mat3(m_Transform))))
+{
+	
+}
+
 Engine::Model::Model(const std::string& path, bool bFlipUV, const Transform& transform) :
 	m_ModelPath(path),
 	m_Transform(GenerateModelMatrix(transform)),
@@ -327,6 +335,34 @@ Engine::Model::Model(const std::string& path, bool bFlipUV, const Transform& tra
 	ProcessNode(scene->mRootNode, scene, assetDirectory, format);
 
 	printf("Loading completed\n");
+}
+
+Engine::Model& Engine::Model::operator()(const std::string& path, bool bFlipUV, const Transform& transform)
+{
+	m_ModelPath = path;
+	m_Transform = GenerateModelMatrix(transform);
+	m_NormalMatrix = glm::transpose(glm::inverse(glm::mat3(m_Transform)));
+	
+	printf("Loading ...\n");
+	Assimp::Importer importer;
+	uint32_t importFlags = aiProcess_Triangulate | aiProcess_GenSmoothNormals;
+	
+	if (bFlipUV)
+		importFlags |= aiProcess_FlipUVs;
+	
+	const aiScene* scene = importer.ReadFile(path, importFlags);
+	
+	uint32_t nodeNum = 1;
+	GetChildrenNum(scene->mRootNode, nodeNum);	
+	m_Parts.reserve(nodeNum);
+
+	std::string assetDirectory = path.substr(0, path.find_last_of('/') + 1);
+	std::string format = path.substr(path.find_last_of('.') + 1);
+	ProcessNode(scene->mRootNode, scene, assetDirectory, format);
+
+	printf("Loading completed\n");
+	
+	return *this;
 }
 
 void Engine::Model::ProcessNode(const aiNode* node, const aiScene* scene, std::string& assetDirectory, std::string& format)

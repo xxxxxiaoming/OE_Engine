@@ -1,4 +1,5 @@
 ﻿#include "RenderExperments.h"
+#include "Scenes.h"
 
 #include <iostream>
 #include <glm/glm.hpp>
@@ -39,18 +40,18 @@ static void ConfigPhongLight(Engine::PhongLight& phongLight, const Engine::vec3&
 	phongLight.EnableDirectionLight();								// 开启方向光源
 	phongLight.ConfigDirectionLight(
 		Engine::vec3{-1.0f, -1.0f, -1.0f},
-		Engine::vec3{0.02f,0.02f,0.02f},
-		Engine::vec3{4.7f,4.7f,4.7f},
+		Engine::vec3{0.3f,0.3f,0.3f},
+		Engine::vec3{2.7f,2.7f,2.7f},
 		Engine::vec3{0.1f,0.1f,0.11f}
 		);
 	
-	// phongLight.AddPointLight(
-	// 	pointLightWorldPosition, 
-	// 	Engine::vec3{0.01f, 0.01f, 0.01f}, 
-	// 	Engine::vec3{2.0f,1.7f,1.7f},
-	// 	Engine::vec3{0.1f, 0.1f, 0.1f},
-	// 	1.0f, 0.001f, 0.0001f
-	// 	);															// 使用2个点光源
+	phongLight.AddPointLight(
+		pointLightWorldPosition, 
+		Engine::vec3{0.3f, 0.3f, 0.3f}, 
+		Engine::vec3{1.7f,1.7f,1.7f},
+		Engine::vec3{0.1f, 0.1f, 0.1f},
+		1.0f, 0.001f, 0.0001f
+		);															// 使用2个点光源
 	
 	// phongLight.AddPointLight(
 	// 	Engine::vec3{pointLightWorldPosition.x + 10.0f, pointLightWorldPosition.y, pointLightWorldPosition.z},
@@ -92,8 +93,12 @@ void GenerateRocksModelMatrices(int amount, float minOrbitRadius, float maxOrbit
 void AdvancedLighting(Engine::Renderer& renderer)
 {
 	/* Camera and controller */
-	glm::vec3 camPostion = glm::vec3(0.0f, 100.0f, 170.0f);
+	// nanosuit camera setting
+	glm::vec3 camPostion = glm::vec3(0.0f, 100.0f, 170.0f);	  
 	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 55.0f, -100.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
+	// backpack camera setting
+	// glm::vec3 camPostion = glm::vec3(0.0f, 20.0f, 10.0f); // backpack camera setting
+	// Engine::Camera cam{ camPostion, glm::vec3(0.0f, 25.0f, -100.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
 	Engine::CameraController camController{ renderer.GetGLFWwinow(), 100.0f, 40.0f };
 	
 	/* HDR render target */
@@ -130,14 +135,14 @@ void AdvancedLighting(Engine::Renderer& renderer)
 	
 	/* Phong Light */
 	Engine::PhongLight phongLight{1024, true};
-	Engine::vec3 pointLightPosition{-10.0f, 70.0f, -50.0f};
+	Engine::vec3 pointLightPosition{-10.0f, 170.0f, -30.0f};
 	ConfigPhongLight(phongLight, pointLightPosition, cam);
 	
 	/* Shadow Map */
 	glm::vec3 shadowMapCamLookAt = glm::vec3(0.0f, 0.0f, -70.0f); // 精准瞄准 Nanosuit
 	glm::vec3 shadowMapCaptureCamPos = shadowMapCamLookAt + glm::vec3(150.0f, 150.0f, 150.0f); // 把光源相机拉近
 	
-	// phongLight.DisableDirectionLight();
+	phongLight.DisableDirectionLight();
 
 	// 将投影矩阵的宽高大幅度缩小到 300x300，让 1024 贴图的像素密度暴增！
 	phongLight.ConfigShadowMapCaptureView(
@@ -147,129 +152,22 @@ void AdvancedLighting(Engine::Renderer& renderer)
 		-150.0f, 150.0f, // Bottom, Top (高度缩减到300)
 		0.1f, 500.0f    // Near, Far
 	);
-	// phongLight.ConfigShadowMapPointCaptureView(
-	// 	0,
-	// 	glm::vec3{pointLightPosition.x, pointLightPosition.y, pointLightPosition.z},
-	// 	90,
-	// 	1.0,
-	// 	0.1f, 2000.0f
-	// );
+	phongLight.ConfigShadowMapPointCaptureView(
+		0,
+		glm::vec3{pointLightPosition.x, pointLightPosition.y, pointLightPosition.z},
+		90,
+		1.0,
+		0.1f, 2000.0f
+	);
 	
-	constexpr float sizeX = 2000.0f;
-	constexpr float sizeY = 2000.0f;
-	Engine::Vertex floorVertices[4];
-	Engine::vec3 positions[1] = {
-		Engine::vec3{-sizeX / 2.0f, -sizeY / 2.0f, 0.0f}
-	};
+	Engine::Object floor, wall, glass;
+	Engine::Model nanoSuit;
 	
-	float width[1] = {
-		sizeX
-	};
-	float height[1] = {
-		sizeY
-	};
-	
-	uint32_t floorIndices[6];
-	
-	std::string assetPath{"res/"};
-	Engine::createRectangle(positions, width, height, floorVertices, floorIndices);
-	
-	for (int index = 0 ; index < 4 ; index++)
-	{
-		Engine::Vertex& vertex = floorVertices[index];
-		vertex.texCoord.x *= 10;
-		vertex.texCoord.y *= 10;
-	}
-	
-	Engine::Transform floorTransform = {
-		glm::vec3(1.0f, 1.0f, 1.0f),
-		glm::vec3(0.0f, 0.0f, -140.0f),
-		glm::vec3(-90.0f, 0.0f, 0.0f)
-	};
-	Engine::Object floor{floorVertices, floorIndices, 4, 6, assetPath, floorTransform};
-	
-	floor.m_TexturesAmbient.reserve(1);
-	floor.m_TexturesDiffuse.reserve(1);
-	floor.m_TextureSpecular.reserve(1);
-	floor.m_TexturesAmbient.emplace_back("res/texture/brickwall.jpg");
-	floor.m_TexturesDiffuse.emplace_back("res/texture/brickwall.jpg");
-	floor.m_TextureSpecular.emplace_back(0xFF000000);
-	floor.m_TextureNormal.emplace_back("res/texture/brickwall_normal.jpg");
-	
-	int floorDiffuseSlot[1] = {1};
-	int floorSpecularSlot[1] = {2};
-	int floorNormalSlot[1] = {3};
-	floor.m_Material.BindAmbientSlots(floorDiffuseSlot, 1);
-	floor.m_Material.BindDiffuseSlots(floorDiffuseSlot, 1);
-	floor.m_Material.BindSpecularSlots(floorSpecularSlot, 1);
-	floor.m_Material.BindNormalSlots(floorNormalSlot, 1);
-	floor.EnableLight();
-	floor.SetBlendMode(Engine::BlendMode::Opaque);
+	CreateAdvancedLightingScene(floor, wall, glass, nanoSuit);
 	
 	phongLight.AddObject("floor", &floor);
-	
-	constexpr float sizeXGlass = 100.0f;
-	constexpr float sizeYGlass = 100.0f;
-	Engine::Vertex glassVertices[4];
-	Engine::vec3 glassPositions[1] = {
-		Engine::vec3{-sizeXGlass / 2.0f, -sizeYGlass / 2.0f, 0.0f}
-	};
-	
-	float glassWidth[1] = {
-		sizeXGlass
-	};
-	float glassHeight[1] = {
-		sizeYGlass
-	};
-	
-	uint32_t glassIndices[6];
-	
-	Engine::createRectangle(glassPositions, glassWidth, glassHeight, glassVertices, glassIndices);
-	
-	Engine::Transform glassTransform = {
-		glm::vec3(1.0f, 1.0f, 1.0f),
-		glm::vec3(0.0f, 50.0f, -30.0f),
-		glm::vec3(0.0f, 0.0f, 0.0f)
-	};
-	Engine::Object glass{glassVertices, glassIndices, 4, 6, assetPath, glassTransform};
-	
-	glass.m_TexturesAmbient.reserve(1);
-	glass.m_TexturesDiffuse.reserve(1);
-	glass.m_TextureSpecular.reserve(1);
-	glass.m_TexturesAmbient.emplace_back("res/texture/blending_transparent_window.png");
-	glass.m_TexturesDiffuse.emplace_back("res/texture/blending_transparent_window.png");
-	glass.m_TextureSpecular.emplace_back(0xFF000000);
-	glass.m_TextureNormal.emplace_back(0xFFFF8080);
-	
-	int glassDiffuseSlot[1] = {8};
-	int glassSpecularSlot[1] = {9};
-	int glassNormalSlot[1] = {10};
-	glass.m_Material.BindAmbientSlots(glassDiffuseSlot, 1);
-	glass.m_Material.BindDiffuseSlots(glassDiffuseSlot, 1);
-	glass.m_Material.BindSpecularSlots(glassSpecularSlot, 1);
-	glass.m_Material.BindNormalSlots(glassNormalSlot, 1);
-	glass.EnableLight();
-	glass.SetBlendMode(Engine::BlendMode::Transparent);
-	
-	phongLight.AddObject("glass", &glass);
-	
-	Engine::Transform nanosuitTransform = {
-		glm::vec3(10.0f, 10.0f, 10.0f),
-		glm::vec3(0.0f, 17.0f, -70.0f),
-		glm::vec3(0.0f, 0.0f, 0.0f),
-	};
-	Engine::Model nanoSuit{"res/assets/backpack/backpack.obj", true
-		, nanosuitTransform};
-	
-	int nanosuitAmbientSlot[1] = {4};
-	int nanoSuitDiffuseSlot[1] = {5};
-	int nanoSuitSpecularSlot[1] = {6};
-	int nanoSuitNormalSlot[1] = {7};
-	nanoSuit.BindAmbientSlot(nanosuitAmbientSlot, 1);
-	nanoSuit.BindDiffuseSlot(nanoSuitDiffuseSlot, 1);
-	nanoSuit.BindSpecularSlot(nanoSuitSpecularSlot, 1);
-	nanoSuit.BindNormalSlot(nanoSuitNormalSlot, 1);
-	
+	phongLight.AddObject("wall", &wall);
+	// phongLight.AddObject("glass", &glass);
 	phongLight.AddModel("nanosuit", &nanoSuit);
 	
 	glm::mat4 projectionMatrix{glm::perspective(glm::radians(45.0f), 640.0f / 360.0f, 0.1f, 3000.0f)};

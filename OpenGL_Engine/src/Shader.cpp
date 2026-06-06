@@ -440,6 +440,26 @@ void Engine::Shader::SetUniform1fv(const std::string& name, int count, const flo
     }
 }
 
+void Engine::Shader::SetUniform3fv(const std::string& name, size_t count, const glm::vec3* value)
+{
+    if (m_UniformLocations.find(name) != m_UniformLocations.end())
+    {
+        int loc = m_UniformLocations[name];
+        GLCALL(glProgramUniform1fv(m_ShaderID, loc, count, &(value->x)));
+    }
+    else
+    {
+        int loc = GetUniformLocation(name);
+        //ASSERT(loc != -1);
+
+        if (loc != -1)
+        {
+            m_UniformLocations[name] = loc;
+            GLCALL(glProgramUniform3fv(m_ShaderID, loc, count, &(value->x)));
+        }
+    }
+}
+
 void Engine::Shader::SetUniformMatrix4fv(const std::string& name, int count, const glm::mat4* value)
 {
     if (m_UniformLocations.find(name) != m_UniformLocations.end())
