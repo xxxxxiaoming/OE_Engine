@@ -2,6 +2,9 @@
 
 #include <array>
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 namespace Engine
 {
 	enum class Operations
@@ -17,6 +20,14 @@ namespace Engine
 		LookLeft,
 		LookRight,
 	};
+	
+	enum class BlendMode
+	{
+		Opaque,
+		Masked,
+		Transparent,
+	};
+	
 	enum class TextureType
 	{
 		DIFFUSE, SPECULAR, NORMAL, NONE
@@ -43,8 +54,20 @@ namespace Engine
         vec2 texCoord;
         vec4 color;
         float textureSlot;
+    	
+    	vec3 tangent;
+    	vec3 bitangent;
     };
-
+	
+	struct Transform
+	{
+		glm::vec3 scale{1.0f, 1.0f, 1.0f};		// Scale of x, y, z
+		glm::vec3 translation{0.0f, 0.0f, 0.0f};  // Translation of x, y, z
+		glm::vec3 rotation{0.0f, 0.0f, 0.0f};		// rotation angle around x, y, z
+	};
+	
+	glm::mat4 GenerateModelMatrix(const Transform& transform);
+	
     template <size_t SIZE = 1>
 	void createRectangle(const vec3* positions, const float* width, const float* height, Vertex* vertices, uint32_t* indices)
 	{
@@ -64,24 +87,32 @@ namespace Engine
 			vertexLeftBottom.texCoord = { 0.0f, 0.0f };
 			vertexLeftBottom.color = { 1.0f, 1.0f, 0.0f, 1.0f };
 			vertexLeftBottom.textureSlot = 0.0f;
+			vertexLeftBottom.tangent = { 1.0f, 0.0f, 0.0f };
+			vertexLeftBottom.bitangent = { 0.0f, 1.0f, 0.0f };
 
 			vertexRightBottom.pos = { position.x + w, position.y, position.z };
 			vertexRightBottom.normal = { 0.0f, 0.0f, 1.0f };
 			vertexRightBottom.texCoord = { 1.0f, 0.0f };
 			vertexRightBottom.color = { 1.0f, 1.0f, 0.0f, 1.0f };
 			vertexRightBottom.textureSlot = 0.0f;
+			vertexRightBottom.tangent = { 1.0f, 0.0f, 0.0f };
+			vertexRightBottom.bitangent = { 0.0f, 1.0f, 0.0f };
 
 			vertexRightTop.pos = { position.x + w, position.y + h, position.z };
 			vertexRightTop.normal = { 0.0f, 0.0f, 1.0f };
 			vertexRightTop.texCoord = { 1.0f, 1.0f };
 			vertexRightTop.color = { 1.0f, 1.0f, 0.0f, 1.0f };
 			vertexRightTop.textureSlot = 0.0f;
+			vertexRightTop.tangent = { 1.0f, 0.0f, 0.0f };
+			vertexRightTop.bitangent = { 0.0f, 1.0f, 0.0f };
 
 			vertexLeftTop.pos = { position.x, position.y + h, position.z };
 			vertexLeftTop.normal = { 0.0f, 0.0f, 1.0f };
 			vertexLeftTop.texCoord = { 0.0f, 1.0f };
 			vertexLeftTop.color = { 1.0f, 1.0f, 0.0f, 1.0f };
 			vertexLeftTop.textureSlot = 0.0f;
+			vertexLeftTop.tangent = { 1.0f, 0.0f, 0.0f };
+			vertexLeftTop.bitangent = { 0.0f, 1.0f, 0.0f };
 		}
 
 		for (int count = 0; count < SIZE; count++)

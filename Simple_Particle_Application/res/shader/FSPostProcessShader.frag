@@ -1,6 +1,7 @@
-﻿#version 330 core
+﻿#version 460 core
 
-uniform sampler2D diffuse;
+uniform sampler2D u_Diffuse;
+uniform bool u_HDR;
 
 in  vec2 v_TexCoord;
 out vec4 color;
@@ -32,12 +33,12 @@ void main()
 	vec3 sampleTex[9];
 	for(int i = 0; i < 9; i++)
 	{
-		sampleTex[i] = vec3(texture(diffuse, v_TexCoord.st + offsets[i]));
+		sampleTex[i] = vec3(texture(u_Diffuse, v_TexCoord.st + offsets[i]));
 	}
 	vec3 col = vec3(0.0);
 	for(int i = 0; i < 9; i++)
 	col += sampleTex[i] * kernel[i];
 
 //	color = vec4(col, 1.0);
-	color = texture(diffuse, v_TexCoord);
+	color = texture(u_Diffuse, v_TexCoord);
 }

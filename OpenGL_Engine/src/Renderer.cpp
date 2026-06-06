@@ -47,6 +47,8 @@ Engine::Renderer::Renderer(int width, int height, const char* title)
     m_ViewportWidth = width;
     m_ViewportHeight = height;
     GLCALL(glViewport(0, 0, width, height));
+    
+    GLCALL(glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS));
 }
 
 // Engine::Renderer::~Renderer()
@@ -80,6 +82,14 @@ void Engine::Renderer::SetViewportAll(unsigned int x, unsigned int y, int width,
     m_ViewportY = y;
     m_ViewportWidth = width;
     m_ViewportHeight = height;
+}
+
+void Engine::Renderer::GetViewPortAll(unsigned int& x, unsigned int& y, int& width, int& height)
+{
+    x = m_ViewportX;
+    y = m_ViewportY;
+    width = m_ViewportWidth;
+    height = m_ViewportHeight;
 }
 
 const GLFWwindow* Engine::Renderer::GetGLFWwinow() const

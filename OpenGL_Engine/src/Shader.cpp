@@ -2,6 +2,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstdio>
+#include <glm/gtc/type_ptr.hpp>
 
 #include "Shader.h"
 #include "Helper.h"
@@ -47,6 +48,11 @@ void Engine::Shader::Delete()
 void Engine::Shader::CreateShader(const std::string& vsFile, const std::string& fsFile, const std::string& gsFile)
 {
     CreateShaderInternal(vsFile, fsFile, gsFile);
+}
+
+void Engine::Shader::CreateShaderFromSource(const char* vsSource, const char* fsSource, const char* gsShader)
+{
+    CreateShaderFromSourceInternal(vsSource, fsSource, gsShader);
 }
 
 unsigned int Engine::Shader::CompileShaderInternal(const char* source, const unsigned int type)
@@ -278,7 +284,7 @@ void Engine::Shader::SetUniform1i(const std::string& name, const int value)
     if (m_UniformLocations.find(name) != m_UniformLocations.end())
     {
         int loc = m_UniformLocations[name];
-        GLCALL(glUniform1i(loc, value));
+        GLCALL(glProgramUniform1i(m_ShaderID, loc, value));
     }
     else if (!name.empty())
     {
@@ -288,7 +294,7 @@ void Engine::Shader::SetUniform1i(const std::string& name, const int value)
         if (loc != -1)
         {
             m_UniformLocations[name] = loc;
-            GLCALL(glUniform1i(loc, value));
+            GLCALL(glProgramUniform1i(m_ShaderID, loc, value));
         }
     }
 }
@@ -298,7 +304,7 @@ void Engine::Shader::SetUniform1f(const std::string& name, const float value)
     if (m_UniformLocations.find(name) != m_UniformLocations.end())
     {
         int loc = m_UniformLocations[name];
-        GLCALL(glUniform1f(loc, value));
+        GLCALL(glProgramUniform1f(m_ShaderID, loc, value));
     }
     else if (!name.empty())
     {
@@ -308,7 +314,7 @@ void Engine::Shader::SetUniform1f(const std::string& name, const float value)
         if (loc != -1)
         {
             m_UniformLocations[name] = loc;
-            GLCALL(glUniform1f(loc, value));
+            GLCALL(glProgramUniform1f(m_ShaderID, loc, value));
         }
     }
 }
@@ -318,7 +324,7 @@ void Engine::Shader::SetUniform3f(const std::string& name, const float value1, c
     if (m_UniformLocations.find(name) != m_UniformLocations.end())
     {
         int loc = m_UniformLocations[name];
-        GLCALL(glUniform3f(loc, value1, value2, value3));
+        GLCALL(glProgramUniform3f(m_ShaderID, loc, value1, value2, value3));
     }
     else if (!name.empty())
     {
@@ -328,7 +334,7 @@ void Engine::Shader::SetUniform3f(const std::string& name, const float value1, c
         if (loc != -1)
         {
             m_UniformLocations[name] = loc;
-            GLCALL(glUniform3f(loc, value1, value2, value3));
+            GLCALL(glProgramUniform3f(m_ShaderID, loc, value1, value2, value3));
         }
     }
 }
@@ -338,7 +344,7 @@ void Engine::Shader::SetUniform4f(const std::string& name, const float value1, c
     if (m_UniformLocations.find(name) != m_UniformLocations.end())
     {
         int loc = m_UniformLocations[name];
-        GLCALL(glUniform4f(loc, value1, value2, value3, value4));
+        GLCALL(glProgramUniform4f(m_ShaderID, loc, value1, value2, value3, value4));
     }
     else if (!name.empty())
     {
@@ -348,7 +354,7 @@ void Engine::Shader::SetUniform4f(const std::string& name, const float value1, c
         if (loc != -1)
         {
             m_UniformLocations[name] = loc;
-            GLCALL(glUniform3f(loc, value1, value2, value3));
+            GLCALL(glProgramUniform4f(m_ShaderID, loc, value1, value2, value3, value4));
         }
     }
 }
@@ -359,7 +365,7 @@ void Engine::Shader::SetUniformMatrix3f(const std::string& name, const glm::mat3
     if (m_UniformLocations.find(name) != m_UniformLocations.end())
     {
         int loc = m_UniformLocations[name];
-        GLCALL(glUniformMatrix3fv(loc, 1, GL_FALSE, &value[0][0]));
+        GLCALL(glProgramUniformMatrix3fv(m_ShaderID, loc, 1, GL_FALSE, &value[0][0]));
     }
     else if (!name.empty())
     {
@@ -369,7 +375,7 @@ void Engine::Shader::SetUniformMatrix3f(const std::string& name, const glm::mat3
         if (loc != -1)
         {
             m_UniformLocations[name] = loc;
-            GLCALL(glUniformMatrix3fv(loc, 1, GL_FALSE, &value[0][0]));
+            GLCALL(glProgramUniformMatrix3fv(m_ShaderID, loc, 1, GL_FALSE, &value[0][0]));
         }
     }   
 }
@@ -379,7 +385,7 @@ void Engine::Shader::SetUniformMatrix4f(const std::string& name, const glm::mat4
     if (m_UniformLocations.find(name) != m_UniformLocations.end())
     {
         int loc = m_UniformLocations[name];
-        GLCALL(glUniformMatrix4fv(loc, 1, GL_FALSE, &value[0][0]));
+        GLCALL(glProgramUniformMatrix4fv(m_ShaderID, loc, 1, GL_FALSE, &value[0][0]));
     }
     else if (!name.empty())
     {
@@ -389,7 +395,7 @@ void Engine::Shader::SetUniformMatrix4f(const std::string& name, const glm::mat4
         if (loc != -1)
         {
             m_UniformLocations[name] = loc;
-            GLCALL(glUniformMatrix4fv(loc, 1, GL_FALSE, &value[0][0]));
+            GLCALL(glProgramUniformMatrix4fv(m_ShaderID, loc, 1, GL_FALSE, &value[0][0]));
         }
     }   
 }
@@ -399,7 +405,7 @@ void Engine::Shader::SetUniform1iv(const std::string& name, int count, const int
     if (m_UniformLocations.find(name) != m_UniformLocations.end())
     {
         int loc = m_UniformLocations[name];
-        GLCALL(glUniform1iv(loc, count, value));
+        GLCALL(glProgramUniform1iv(m_ShaderID, loc, count, value));
     }
     else
     {
@@ -409,7 +415,7 @@ void Engine::Shader::SetUniform1iv(const std::string& name, int count, const int
         if (loc != -1)
         {
             m_UniformLocations[name] = loc;
-            GLCALL(glUniform1iv(loc, count, value));
+            GLCALL(glProgramUniform1iv(m_ShaderID, loc, count, value));
         }
     }
 }
@@ -419,7 +425,7 @@ void Engine::Shader::SetUniform1fv(const std::string& name, int count, const flo
     if (m_UniformLocations.find(name) != m_UniformLocations.end())
     {
         int loc = m_UniformLocations[name];
-        GLCALL(glUniform1fv(loc, count, value));
+        GLCALL(glProgramUniform1fv(m_ShaderID, loc, count, value));
     }
     else
     {
@@ -429,7 +435,46 @@ void Engine::Shader::SetUniform1fv(const std::string& name, int count, const flo
         if (loc != -1)
         {
             m_UniformLocations[name] = loc;
-            GLCALL(glUniform1fv(loc, count, value));
+            GLCALL(glProgramUniform1fv(m_ShaderID, loc, count, value));
+        }
+    }
+}
+
+void Engine::Shader::SetUniform3fv(const std::string& name, size_t count, const glm::vec3* value)
+{
+    if (m_UniformLocations.find(name) != m_UniformLocations.end())
+    {
+        int loc = m_UniformLocations[name];
+        GLCALL(glProgramUniform1fv(m_ShaderID, loc, count, &(value->x)));
+    }
+    else
+    {
+        int loc = GetUniformLocation(name);
+        //ASSERT(loc != -1);
+
+        if (loc != -1)
+        {
+            m_UniformLocations[name] = loc;
+            GLCALL(glProgramUniform3fv(m_ShaderID, loc, count, &(value->x)));
+        }
+    }
+}
+
+void Engine::Shader::SetUniformMatrix4fv(const std::string& name, int count, const glm::mat4* value)
+{
+    if (m_UniformLocations.find(name) != m_UniformLocations.end())
+    {
+        int loc = m_UniformLocations[name];
+        GLCALL(glProgramUniformMatrix4fv(m_ShaderID, loc, count, GL_FALSE, glm::value_ptr(value[0][0])));
+    }
+    else
+    {
+        int loc = GetUniformLocation(name);
+        
+        if (loc != -1)
+        {
+            m_UniformLocations[name] = loc;
+            GLCALL(glProgramUniformMatrix4fv(m_ShaderID, loc, count, GL_FALSE, glm::value_ptr(value[0])));
         }
     }
 }

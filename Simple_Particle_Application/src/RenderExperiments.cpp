@@ -1,8 +1,24 @@
 ﻿#include "RenderExperments.h"
+#include "Scenes.h"
 
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
+#define USE_DEFERRED_RENDERING
+
+float exposure = 1.0f;
+static void ProcessInput(Engine::Renderer& renderer, float deltaTime)
+{
+	if (glfwGetKey(const_cast<GLFWwindow*>(renderer.GetGLFWwinow()), GLFW_KEY_1) == GLFW_PRESS)
+	{
+		exposure = exposure + 0.1f;
+	}
+	else if (glfwGetKey(const_cast<GLFWwindow*>(renderer.GetGLFWwinow()), GLFW_KEY_2) == GLFW_PRESS)
+	{
+		exposure = exposure - 0.1f > 0.0f ? exposure - 0.1f : exposure;
+	}
+}
 
 static void BindKeys(Engine::CameraController& camController)
 {
@@ -23,29 +39,37 @@ static void ConfigPhongLight(Engine::PhongLight& phongLight, const Engine::vec3&
 	/* 光照配置 */
 	phongLight.EnableDirectionLight();								// 开启方向光源
 	phongLight.ConfigDirectionLight(
-		Engine::vec3{1.0f, 1.0f, 1.0f},
-		Engine::vec3{0.5f,0.5f,0.5f},
-		Engine::vec3{1.0f,1.0f,1.0f},
-		Engine::vec3{0.7f,0.7f,0.7f}
+		Engine::vec3{-1.0f, -1.0f, -1.0f},
+		Engine::vec3{0.3f,0.3f,0.3f},
+		Engine::vec3{2.7f,2.7f,2.7f},
+		Engine::vec3{0.1f,0.1f,0.11f}
 		);
 	
 	phongLight.AddPointLight(
 		pointLightWorldPosition, 
-		Engine::vec3{0.1f, 0.1f, 0.1f}, 
-		Engine::vec3{0.5f,0.5f,0.5f},
-		Engine::vec3{1.0f, 1.0f, 1.0f},
+		Engine::vec3{0.3f, 0.3f, 0.3f}, 
+		Engine::vec3{1.7f,1.7f,1.7f},
+		Engine::vec3{0.1f, 0.1f, 0.1f},
 		1.0f, 0.001f, 0.0001f
-		);															// 使用1个点光源
+		);															// 使用2个点光源
+	
+	// phongLight.AddPointLight(
+	// 	Engine::vec3{pointLightWorldPosition.x + 10.0f, pointLightWorldPosition.y, pointLightWorldPosition.z},
+	// 	Engine::vec3{0.1f, 0.1f, 0.1f}, 
+	// 	Engine::vec3{7.17f,5.0f,5.0f},
+	// 	Engine::vec3{5.5f, 5.5f, 5.5f},
+	// 	1.0f, 0.001f, 0.0001f
+	// 	);
 	
 	// glm::vec3 cameraWorldPosition = camera.GetPosition();
 	// glm::vec3 cameraLookDirection = camera.GetFront();
 	// phongLight.AddSpotLight(
 	// 	Engine::vec3{cameraWorldPosition.x, cameraWorldPosition.y, cameraWorldPosition.z},
 	// 	Engine::vec3{cameraLookDirection.x, cameraLookDirection.y, cameraLookDirection.z},
-	// 	Engine::vec3{0.1f, 0.1f, 0.1f},
+	// 	Engine::vec3{0.01f, 0.01f, 0.01f},
+	// 	Engine::vec3{0.7f, 0.7f, 0.7f},
 	// 	Engine::vec3{0.5f, 0.5f, 0.5f},
-	// 	Engine::vec3{0.3f, 0.3f, 0.3f},
-	// 	5.0f, 10.0f, 1.0f, 0.001f, 0.0001f
+	// 	50.0f, 70.0f, 1.0f, 0.001f, 0.0001f
 	// 	);															// 使用1个聚光源
 }
 
@@ -55,7 +79,7 @@ void GenerateRocksModelMatrices(int amount, float minOrbitRadius, float maxOrbit
 	{
 		float rotateAngle = Engine::Random::Float(0.0f, 360.0f);
 		float radius = Engine::Random::Float(minOrbitRadius, maxOrbitRadius);
-		float scaleFactor = Engine::Random::Float(0.2, 0.3);
+		float scaleFactor = Engine::Random::Float(0.2f, 0.3f);
 		glm::mat4 modelMatrix{1.0f};
 		modelMatrix = glm::translate(modelMatrix, glm::vec3(0.0f, 0.0f, zOffset));
 		modelMatrix = glm::rotate(modelMatrix, rotateAngle, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -63,6 +87,148 @@ void GenerateRocksModelMatrices(int amount, float minOrbitRadius, float maxOrbit
 		modelMatrix = glm::scale(modelMatrix, glm::vec3(scaleFactor, scaleFactor, scaleFactor));
 		
 		matrices[count] = modelMatrix;
+	}
+}
+
+void AdvancedLighting(Engine::Renderer& renderer)
+{
+	/* Camera and controller */
+	// nanosuit camera setting
+	glm::vec3 camPostion = glm::vec3(0.0f, 100.0f, 170.0f);	  
+	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 55.0f, -100.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
+	// backpack camera setting
+	// glm::vec3 camPostion = glm::vec3(0.0f, 20.0f, 10.0f); // backpack camera setting
+	// Engine::Camera cam{ camPostion, glm::vec3(0.0f, 25.0f, -100.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
+	Engine::CameraController camController{ renderer.GetGLFWwinow(), 100.0f, 40.0f };
+	
+	/* HDR render target */
+	bool bHDR = true;
+	Engine::RenderTarget renderTargetHDR{1280, 720, true};
+	renderTargetHDR.CreateColorAttachment();
+	renderTargetHDR.CreateRenderBuffer();
+	
+	Engine::vec3 rectPos[1] = { Engine::vec3{-1.0f, -1.0f, 0.0f} };
+	Engine::Vertex vertices[4];
+	uint32_t indices[6];
+	float widthHDRRect[1] = { 2.0f };
+	float heightHDRRect[1] = { 2.0f };
+	std::string assetDirector{ "res/texture" };
+	
+	Engine::createRectangle(rectPos, widthHDRRect, heightHDRRect, vertices, indices);
+	Engine::Object rectObj{ vertices, indices, 4, 6, assetDirector };
+	
+	rectObj.DisableLight();
+	
+	std::string vsShaderPathRect = "res/shader/FBVSShader.vert";
+	std::string fsShaderPathRect = "res/shader/FSHDR.frag";
+	Engine::Shader shaderRect{ vsShaderPathRect, fsShaderPathRect };
+	Engine::Material matForRect;
+	matForRect.BindShader(&shaderRect);
+	shaderRect.SetUniform1f("u_Exposure", exposure);
+	shaderRect.SetUniform1i("u_HDR", bHDR);
+	
+	/* Bind keys */
+	BindKeys(camController);
+
+	/* Possess camera */
+	camController.PossessCamera(&cam);
+	
+	/* Phong Light */
+	Engine::PhongLight phongLight{1024, true};
+	Engine::vec3 pointLightPosition{-10.0f, 170.0f, -30.0f};
+	ConfigPhongLight(phongLight, pointLightPosition, cam);
+	
+	/* Shadow Map */
+	glm::vec3 shadowMapCamLookAt = glm::vec3(0.0f, 0.0f, -70.0f); // 精准瞄准 Nanosuit
+	glm::vec3 shadowMapCaptureCamPos = shadowMapCamLookAt + glm::vec3(150.0f, 150.0f, 150.0f); // 把光源相机拉近
+	
+	phongLight.DisableDirectionLight();
+
+	// 将投影矩阵的宽高大幅度缩小到 300x300，让 1024 贴图的像素密度暴增！
+	phongLight.ConfigShadowMapCaptureView(
+		shadowMapCaptureCamPos, 
+		shadowMapCamLookAt, 
+		-150.0f, 150.0f, // Left, Right (宽度缩减到300)
+		-150.0f, 150.0f, // Bottom, Top (高度缩减到300)
+		0.1f, 500.0f    // Near, Far
+	);
+	phongLight.ConfigShadowMapPointCaptureView(
+		0,
+		glm::vec3{pointLightPosition.x, pointLightPosition.y, pointLightPosition.z},
+		90,
+		1.0,
+		0.1f, 2000.0f
+	);
+	
+	Engine::Object floor, wall, glass;
+	Engine::Model nanoSuit;
+	
+	CreateAdvancedLightingScene(floor, wall, glass, nanoSuit);
+	
+	phongLight.AddObject("floor", &floor);
+	phongLight.AddObject("wall", &wall);
+	// phongLight.AddObject("glass", &glass);
+	phongLight.AddModel("nanosuit", &nanoSuit);
+	
+	glm::mat4 projectionMatrix{glm::perspective(glm::radians(45.0f), 640.0f / 360.0f, 0.1f, 3000.0f)};
+	
+	double lastFrameTime = glfwGetTime();
+	while (!renderer.CheckWindowShouldClose())
+	{
+		double thisFrameTime = glfwGetTime();
+		double deltaTime = thisFrameTime - lastFrameTime;
+		lastFrameTime = thisFrameTime;
+		
+		camController.ProcessInput(static_cast<float>(deltaTime));
+		ProcessInput(renderer, deltaTime);
+		
+		glm::mat4 viewMat = cam.GetViewMatrix();
+		glm::vec3 camPosRealTime = cam.GetPosition();
+		glm::vec3 camFrontRealTime = cam.GetFront();
+		
+		phongLight.ConfigCameraWorldPosition(camPosRealTime);
+		// phongLight.ConfigPointLightPosition(0, Engine::vec3{camPosRealTime.x, camPosRealTime.y, camPosRealTime.z});
+		
+		/* 每帧更新聚光源的位置，模拟控制手电筒^-^ */
+		phongLight.ConfigSpotLightPosition(0, Engine::vec3{camPosRealTime.x, camPosRealTime.y, camPosRealTime.z});
+		phongLight.ConfigSpotLightDirection(0, Engine::vec3{camFrontRealTime.x, camFrontRealTime.y, camFrontRealTime.z});
+		
+		if (bHDR)
+		{
+			renderTargetHDR.BindFramebuffer();
+		
+			renderer.OnRender();
+		
+			/* Draw Scene */
+			phongLight.TurnOn(renderer, viewMat, projectionMatrix);
+			phongLight.TurnOff(renderer);
+		
+			renderTargetHDR.UnbindFramebuffer();
+		
+			renderer.OnRender();
+		
+			matForRect.UseMaterial();
+			// uint32_t texture = renderTargetHDR.GetTextureBuffer();
+			uint32_t texture = phongLight.GetFinalRenderTarget().GetTextureBuffer();
+			glBindTextureUnit(10, texture);
+			
+			shaderRect.SetUniform1i("u_Diffuse", 10);
+			shaderRect.SetUniform1f("u_Exposure", exposure);
+			rectObj.OnDraw();
+			renderer.DrawElements(rectObj.GetIndexCount(), nullptr);
+		
+			renderer.Render();
+		}
+		else
+		{
+			renderer.OnRender();
+		
+			/* Draw Scene */
+			phongLight.TurnOn(renderer, viewMat, projectionMatrix);
+			phongLight.TurnOff(renderer);
+		
+			renderer.Render();
+		}
 	}
 }
 
@@ -143,17 +309,17 @@ void InstanceExperiment(Engine::Renderer& renderer)
 		
 		renderer.OnRender();
 		
-		planetShader.Use();
 		planetShader.SetUniformMatrix4f("u_Model", planetModelMatrix);
 		planetShader.SetUniformMatrix4f("u_View", viewMatrix);
 		planetShader.SetUniformMatrix4f("u_Projection", projectionMatrix);
 		planetShader.SetUniform1i("u_Diffuse", 0);
+		planetShader.Use();
 		planet.Draw(renderer);
 		
-		rockShader.Use();
 		rockShader.SetUniformMatrix4f("u_View", viewMatrix);
 		rockShader.SetUniformMatrix4f("u_Projection", projectionMatrix);
 		rockShader.SetUniform1i("u_Diffuse", 2);
+		rockShader.Use();
 		rock.DrawInstanced(renderer, asteroidAmount);
 		
 		renderer.Render();
@@ -269,7 +435,7 @@ void RenderTargetExperiment(Engine::Renderer& renderer)
 		// phongLight.TurnOn();
 		GLCALL(glActiveTexture(GL_TEXTURE0));
 		GLCALL(glBindTexture(GL_TEXTURE_CUBE_MAP, skyBox.GetSkyBoxCubeMap()));
-		skyBoxReflectShader.Use();
+
 		skyBoxReflectShader.SetUniform1i("u_CubeMap", 0);
 		skyBoxReflectShader.SetUniformMatrix4f("u_Model", modelMat);
 		skyBoxReflectShader.SetUniformMatrix4f("u_View", viewMat);
@@ -277,6 +443,7 @@ void RenderTargetExperiment(Engine::Renderer& renderer)
 		skyBoxReflectShader.SetUniform3f("u_CameraPosition", camPosRealTime.x, camPosRealTime.y, camPosRealTime.z);
 		skyBoxReflectShader.SetUniform3f("u_LightPosition", lightWorldPos.x, lightWorldPos.y, lightWorldPos.z);
 		skyBoxReflectShader.SetUniformMatrix3f("u_NormalMat", normalMat);
+		skyBoxReflectShader.Use();
 		model.Draw(renderer);
 		// phongLight.TurnOff();
 		
@@ -381,14 +548,12 @@ void StencilTestExperiment(const std::string& path, Engine::Renderer& renderer)
 		renderer.SetStencilFunc(GL_ALWAYS, 1, 0xFF);
 		renderer.SetStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 		
-		phongLight.AddModel(model);
-		phongLight.TurnOn();
-		model.Draw(renderer);
-		phongLight.TurnOff();
+		phongLight.AddModel("backpack", &model);
+		phongLight.TurnOn(renderer, viewMat, projectionMat);
+		// model.Draw(renderer);
+		phongLight.TurnOff(renderer);
 
 		model.BindShader(&shaderFrame);
-		
-		shaderFrame.Use();
 
 		shaderFrame.SetUniformMatrix4f("u_Model", modelMatFrame);
 		shaderFrame.SetUniformMatrix4f("u_View", viewMat);
@@ -397,7 +562,10 @@ void StencilTestExperiment(const std::string& path, Engine::Renderer& renderer)
 
 		renderer.SetStencilFunc(GL_NOTEQUAL, 1, 0xFF);
 		renderer.SetStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+		
+		shaderFrame.Use();
 		model.Draw(renderer);
+		shaderFrame.UnUse();
 
 		renderer.Render();
 	}

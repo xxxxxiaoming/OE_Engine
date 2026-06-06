@@ -13,7 +13,8 @@ Engine::Camera::Camera(const glm::vec3& position, const glm::vec3& look, const g
     m_Position(position), m_Up(up)
 {
     m_Front = glm::normalize(look - position);
-    m_Right = glm::normalize(glm::cross(m_Front, m_Up));
+    m_Right = glm::normalize(glm::cross(m_Front, up));
+    m_Up = glm::normalize(glm::cross(m_Right, m_Front));
 }
 
 Engine::Camera::Camera(const glm::vec3& position, float pitch, float yaw, float roll) :

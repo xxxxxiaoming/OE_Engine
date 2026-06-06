@@ -26,28 +26,58 @@ namespace Engine
 
 		bool m_Cleared = false;
 		bool m_EnableLight = false;
+		
+		BlendMode m_BlendMode = BlendMode::Opaque;
+		
+		glm::mat4 m_Transform;
+		glm::mat3 m_NormalMatrix;
 	public:
 		std::string m_AssetDirectory;
 		
 		Material m_Material;
+		std::vector<Texture> m_TexturesAmbient;
 		std::vector<Texture> m_TexturesDiffuse;
 		std::vector<Texture> m_TextureSpecular;
+		std::vector<Texture> m_TextureNormal;
 		
-		Object(const Vertex* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t indexCount, std::string& assetDirectory);
+		Object();
+		Object(const Vertex* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t indexCount, std::string& assetDirectory, const Transform& transform = Transform{}, BlendMode blendMode = BlendMode::Opaque);
 		~Object();
 
 		void OnDraw();
 		 
 		void Destroy();
 
-		inline void EnableLight() { m_EnableLight = true; }
-		inline void DisableLight() { m_EnableLight = false; }
+		void EnableLight() { m_EnableLight = true; }
+		void DisableLight() { m_EnableLight = false; }
+		
+		Object& operator()(const Vertex* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t indexCount, std::string& assetDirectory, const Transform& transform = Transform{});
 
-		inline VertexArrayBuffer& GetVAO() { return m_VAO; }
-		inline VertexBuffer& GetVBO() { return m_VBO; }
-		inline IndexBuffer& GetIBO()  { return m_IBO; }
-		inline uint32_t GetIndexCount() const { return m_IndexCount; }
-		inline uint32_t GetVertexCount() const { return m_VertexCount; }
+		VertexArrayBuffer& GetVAO() { return m_VAO; }
+		VertexBuffer& GetVBO() { return m_VBO; }
+		IndexBuffer& GetIBO()  { return m_IBO; }
+		uint32_t GetIndexCount() const { return m_IndexCount; }
+		uint32_t GetVertexCount() const { return m_VertexCount; }
+		glm::mat4 GetTransform() const { return m_Transform; }
+		glm::mat3 GetNormalMatrix() const { return m_NormalMatrix; }
+		BlendMode GetBlendMode() const { return m_BlendMode; }
+		
+		void SetTransform(const Transform& transform)
+		{
+			m_Transform = GenerateModelMatrix(transform);
+			m_NormalMatrix = glm::transpose(glm::inverse(glm::mat3(m_Transform)));
+		}
+		
+		void SetTransform(const glm::mat4& transform)
+		{
+			m_Transform = transform;
+			m_NormalMatrix = glm::transpose(glm::inverse(glm::mat3(m_Transform)));
+		}
+		
+		void SetBlendMode(BlendMode blendMode)
+		{
+			m_BlendMode = blendMode;
+		}
 	};
 }
 

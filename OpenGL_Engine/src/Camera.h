@@ -23,12 +23,12 @@ namespace Engine
         Camera(const glm::vec3& position, float pitch, float yaw, float roll);
     
         glm::mat4 GetViewMatrix() const;
-		inline glm::vec3 GetPosition() const { return m_Position; }
-		inline glm::vec3 GetFront() const { return m_Front; }
-		inline glm::vec3 GetUp() const { return m_Up; }
-		inline glm::vec3 GetRight() const { return m_Right; }
+    	glm::vec3 GetPosition() const { return m_Position; }
+    	glm::vec3 GetFront() const { return m_Front; }
+    	glm::vec3 GetUp() const { return m_Up; }
+    	glm::vec3 GetRight() const { return m_Right; }
         
-        inline void SetSpeed(float moveSpeed, float rotateSpeed) {  m_MoveSpeed = moveSpeed; m_RotateSpeed = rotateSpeed; };
+    	void SetSpeed(float moveSpeed, float rotateSpeed) {  m_MoveSpeed = moveSpeed; m_RotateSpeed = rotateSpeed; };
         
         /* Movements */
         void MoveForward(float distance);

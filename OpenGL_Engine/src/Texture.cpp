@@ -9,7 +9,19 @@ Engine::Texture::Texture() :
 {
 }
 
-Engine::Texture::Texture(const std::string& fileName) : m_FileName(fileName)
+Engine::Texture::Texture(uint32_t colorData) : m_FileName("Memory_Texture"), m_Width(1), m_Height(1), m_BPP(4)
+{
+    GLCALL(glGenTextures(1, &m_GLTextureID));
+    GLCALL(glBindTexture(GL_TEXTURE_2D, m_GLTextureID));
+    GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+    GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+    GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));
+    GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
+    // 直接把这 4 个字节当成像素数据传给 OpenGL
+    GLCALL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, &colorData));
+}
+
+Engine::Texture::Texture(const std::string& fileName, bool bFlipVertical) : m_FileName(fileName)
 {
     if (CACHE_MAP.find(fileName) != CACHE_MAP.end() && CACHE_MAP[fileName] != nullptr)
     {
@@ -27,7 +39,9 @@ Engine::Texture::Texture(const std::string& fileName) : m_FileName(fileName)
     }
     
     /* 垂直翻转图片，使图片的坐标原点在左下角 */
-    stbi_set_flip_vertically_on_load(1);
+    if (bFlipVertical)
+        stbi_set_flip_vertically_on_load(1);
+    
     /* load texture image */
     unsigned char* textLocalBuffer = stbi_load(fileName.c_str(), &m_Width, &m_Height,&m_BPP, 0);
 
@@ -44,7 +58,7 @@ Engine::Texture::Texture(const std::string& fileName) : m_FileName(fileName)
         innerFormat = GL_RGB8;
         format = GL_RGB;
     }
-    else if (m_BPP = 4)
+    else if (m_BPP == 4)
     {
         innerFormat = GL_RGBA8;
         format = GL_RGBA;
@@ -143,10 +157,10 @@ void Engine::Texture::Bind(int slot)
 {
     /* OpenGL 支持处理多张纹理，通过给不同纹理插槽绑定不同的纹理缓冲区，下面两句代码需要成对出现，意味着，将m_TextureID这个纹理缓冲区绑定到GL_TEXTURE0 + slot 这个纹理插槽上去 */
     m_Slot = slot;
-    GLCALL(glActiveTexture(GL_TEXTURE0 + slot));
-    GLCALL(glBindTexture(GL_TEXTURE_2D, m_GLTextureID));
+    // GLCALL(glActiveTexture(GL_TEXTURE0 + slot));
+    // GLCALL(glBindTexture(GL_TEXTURE_2D, m_GLTextureID));
     /* 现代OpenGL(OpenGL 4.5及之后)提供了有一个合二为一的API */
-    // GLCALL(glBindTextureUnit(slot, m_GLTextureID));
+    GLCALL(glBindTextureUnit(slot, m_GLTextureID));
 }
 
 void Engine::Texture::UnBind() const
