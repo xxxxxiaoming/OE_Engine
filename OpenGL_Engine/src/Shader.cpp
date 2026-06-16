@@ -80,7 +80,7 @@ unsigned int Engine::Shader::CompileShaderInternal(const char* source, const uns
         GLCALL(glGetShaderInfoLog(shaderID, sizeof(char) * length, &length, log));
         GLCALL(glDeleteShader(shaderID));
         
-        printf("Shader compiling failed.\n Error Info: \n%s\n", log);
+        printf("%s Shader compiling failed.\n Error Info: \n%s\n", type == GL_VERTEX_SHADER ? "Vertex" : "Fragment", log);
         
         shaderID = 0;
     }

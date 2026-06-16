@@ -260,14 +260,14 @@ void Engine::PhongLight::DeferredRenderInternal(Renderer& renderer, const glm::m
     m_RTLight.UnbindFramebuffer();
 }
 
-Engine::PhongLight::PhongLight(int shadowMapResolution, bool bDeffered) : 
+Engine::PhongLight::PhongLight(uint16_t renderResolutionX, uint16_t renderResolutionY, int shadowMapResolution, bool bDeffered) : 
     m_ShadowMap(shadowMapResolution, false),
     m_UseDeffered(bDeffered),
     m_ShadowMapResolution(shadowMapResolution),
-    m_RTGBuffer(1280, 720, true),
-    m_RTLight(1280, 720, true),
-    m_RTSSAO(1280, 720, true),
-    m_RTSSAOSmoth(1280, 720, true)
+    m_RTGBuffer(renderResolutionX, renderResolutionY, true),
+    m_RTLight(renderResolutionX, renderResolutionY, true),
+    m_RTSSAO(renderResolutionX, renderResolutionY, true),
+    m_RTSSAOSmoth(renderResolutionX, renderResolutionY, true)
 {
     m_ShadowMapPoint.reserve(MAX_NON_DIRECTIONAL_LIGHTS);
     m_PointLightsNeedCapture.reserve(MAX_NON_DIRECTIONAL_LIGHTS);
@@ -284,7 +284,7 @@ Engine::PhongLight::PhongLight(int shadowMapResolution, bool bDeffered) :
     m_ShaderSSAO.CreateShaderFromSource(vsShaderCodeLight, fsSSAOCode);
     m_ShaderSSAOSmoth.CreateShaderFromSource(vsShaderCodeLight, fsSSAOBlurCode);
     
-    int resolution[2] = {1280, 720};
+    int resolution[2] = {renderResolutionX, renderResolutionY};
     std::vector<glm::vec3> samples;
     GenerateSSAOSamples(samples, m_SSAONoiseTexture);
     GLCALL(glBindTextureUnit(11, m_SSAONoiseTexture));
@@ -315,7 +315,7 @@ Engine::PhongLight::PhongLight(int shadowMapResolution, bool bDeffered) :
     float heightHDRRect[1] = { 2.0f };
     std::string assetDirector{ "res/texture" };
 	
-    createRectangle(rectPos, widthHDRRect, heightHDRRect, vertices, indices);
+    createRectangle(rectPos, widthHDRRect, heightHDRRect, vertices, indices, 1);
     m_RenderRect(vertices, indices, 4, 6, assetDirector);
     m_RenderRect.DisableLight();
     
@@ -368,9 +368,12 @@ void Engine::PhongLight::TurnOn(Renderer& renderer, const glm::mat4& viewMatrix,
 
     DeferredRenderInternal(renderer, viewMatrix, projectionMatrix);
     
+    int bufferSizeX, bufferSizeY;
+    m_RTGBuffer.GetRTSize(bufferSizeX, bufferSizeY);
+    
     GLCALL(glBindFramebuffer(GL_READ_FRAMEBUFFER, m_RTGBuffer.GetFBO()));
     GLCALL(glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_RTLight.GetFBO()));
-    GLCALL(glBlitFramebuffer(0, 0, 1280, 720, 0, 0, 1280, 720, GL_DEPTH_BUFFER_BIT, GL_NEAREST));
+    GLCALL(glBlitFramebuffer(0, 0, bufferSizeX, bufferSizeY, 0, 0, bufferSizeX, bufferSizeY, GL_DEPTH_BUFFER_BIT, GL_NEAREST));
     GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
     
     ForwardRenderInternal(renderer, viewMatrix, projectionMatrix);

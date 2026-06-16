@@ -1,5 +1,137 @@
 #include "Scenes.h"
+#include "EngineConfig.h"
+#include "Helper.h"
 
+#ifdef PBR_PIPELINE
+void CreatePBRScene(Engine::Object& floor, Engine::Model& model)
+{
+    // floor
+    constexpr float sizeX = 100.0f;
+    constexpr float sizeY = 100.0f;
+    Engine::Vertex floorVertices[4];
+    Engine::vec3 positions[1] = {
+        Engine::vec3{-sizeX / 2.0f, -sizeY / 2.0f, 0.0f}
+    };
+	
+    float width[1] = {
+        sizeX
+    };
+    float height[1] = {
+        sizeY
+    };
+    
+    uint32_t floorIndices[6];
+    
+    std::string assetPath{"res/"};
+    Engine::createRectangle(positions, width, height, floorVertices, floorIndices, 1);
+    
+    for (int index = 0 ; index < 4 ; index++)
+    {
+        Engine::Vertex& vertex = floorVertices[index];
+        vertex.texCoord.x *= 1.0f;
+        vertex.texCoord.y *= 1.0f;
+    }
+	
+    Engine::Transform floorTransform = {
+        glm::vec3(1.0f, 1.0f, 1.0f),
+        glm::vec3(0.0f, 0.0f, 0.0f),
+        glm::vec3(-90.0f, 0.0f, 0.0f)
+    };
+    floor(floorVertices, floorIndices, 4, 6, assetPath, floorTransform);
+    
+    std::string albedo;
+    std::string metallic;
+    std::string roughness;
+    std::string ao;
+    std::string normal;
+    Engine::PBRTexturePhaser(albedo, metallic, roughness, ao, normal, "res/texture/stone-house-siding-bl/", "stone-house-siding", "ogl");
+    
+    floor.m_TextureAlbedo.reserve(1);
+    floor.m_TextureMetallic.reserve(1);
+    floor.m_TextureRoughness.reserve(1);
+    floor.m_TextureAO.reserve(1);
+    floor.m_TextureNormal.reserve(1);
+    floor.m_TextureEmissive.reserve(1);
+    
+    floor.m_TextureAlbedo.emplace_back(0xFFFFFFFF);
+    floor.m_TextureMetallic.emplace_back(0xFF000000);
+    floor.m_TextureRoughness.emplace_back(0xFFFFFFFF);
+    floor.m_TextureAO.emplace_back(ao);
+    floor.m_TextureNormal.emplace_back(0xFF808080);
+    floor.m_TextureEmissive.emplace_back(0xFF000000);
+    
+    Engine::Transform modelTransform = {
+        glm::vec3(1.0f, 1.0f, 1.0f),
+        glm::vec3(0.0f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 30.0f, 0.0f),
+    };
+    model("res/assets/1969_ford_mustang_mach-1_428_cobra_jet/scene.gltf", false
+         , modelTransform);
+    
+    // Engine::Transform modelTransform = {
+    //     glm::vec3(0.05f, 0.05f, 0.05f),
+    //     glm::vec3(0.0f, 0.0f, 0.0f),
+    //     glm::vec3(0.0f, 0.0f, 0.0f),
+    // };
+    // model("res/assets/glTF-Sample-Models/Sponza/glTF/Sponza.gltf", false
+    //      , modelTransform);
+}
+
+void CreatePBRMaterialSphere(Engine::Object& object)
+{
+    Engine::Transform sphereTransform = {
+        glm::vec3(1.0f, 1.0f, 1.0f),
+        glm::vec3(0.0f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 0.0f, 0.0f),
+    };
+    std::string assetPath{"res/"};
+    std::string albedo;
+    std::string metallic;
+    std::string roughness;
+    std::string ao;
+    std::string normal;
+    Engine::PBRTexturePhaser(albedo, metallic, roughness, ao, normal, "res/texture/Titanium-Scuffed-bl/", "Titanium-Scuffed", "ogl");
+    
+    constexpr int SECTORS = 64;
+    constexpr int STACKS = 32;
+    
+    constexpr int vertexCount = (SECTORS + 1) * (STACKS + 1);
+    constexpr int indexCount = STACKS * SECTORS * 6;
+
+    Engine::Vertex vertices[vertexCount];
+    uint32_t indices[indexCount];
+
+    Engine::vec3 centers[1] = { {0.0f, 0.0f, 0.0f} };
+    float radius[1] = { 10.0f };
+    
+    Engine::CreateSphere(centers, radius, SECTORS, STACKS, vertices, indices, 1);
+    object(vertices, indices, vertexCount, indexCount, assetPath, sphereTransform);
+    object.m_UseMRA = false;
+    object.m_Material.metallicFactor = 1.0f;
+    object.m_Material.roughnessFactor = 1.0f;
+    object.m_Material.cutOff = 0.0f;
+    
+    object.m_TextureAlbedo.reserve(1);
+    object.m_TextureMetallic.reserve(1);
+    object.m_TextureRoughness.reserve(1);
+    object.m_TextureAO.reserve(1);
+    object.m_TextureNormal.reserve(1);
+    object.m_TextureEmissive.reserve(1);
+    
+    object.m_TextureAlbedo.emplace_back(albedo);
+    object.m_TextureMetallic.emplace_back(metallic);
+    object.m_TextureRoughness.emplace_back(roughness);
+    object.m_TextureAO.emplace_back(0xFFFFFFFF);
+    object.m_TextureNormal.emplace_back(normal);
+    object.m_TextureEmissive.emplace_back(0xFF000000);
+    
+    object.EnableLight();
+    object.SetBlendMode(Engine::BlendMode::Opaque);
+}
+#endif
+
+
+#ifdef BLING_PHONG_PIPLINE
 void CreateAdvancedLightingScene(Engine::Object& floor, Engine::Object& wall, Engine::Object& glass, Engine::Model& model)
 {
     // floor
@@ -20,7 +152,7 @@ void CreateAdvancedLightingScene(Engine::Object& floor, Engine::Object& wall, En
     uint32_t floorIndices[6];
     
     std::string assetPath{"res/"};
-    Engine::createRectangle(positions, width, height, floorVertices, floorIndices);
+    Engine::createRectangle(positions, width, height, floorVertices, floorIndices, 1);
     
     for (int index = 0 ; index < 4 ; index++)
     {
@@ -71,7 +203,7 @@ void CreateAdvancedLightingScene(Engine::Object& floor, Engine::Object& wall, En
     
     uint32_t wallIndices[6];
     
-    Engine::createRectangle(wallPositions, wallWidth, wallHeight, wallVertices, wallIndices);
+    Engine::createRectangle(wallPositions, wallWidth, wallHeight, wallVertices, wallIndices, 1);
     
     for (int index = 0 ; index < 4 ; index++)
     {
@@ -122,7 +254,7 @@ void CreateAdvancedLightingScene(Engine::Object& floor, Engine::Object& wall, En
 	
     uint32_t glassIndices[6];
 	
-    Engine::createRectangle(glassPositions, glassWidth, glassHeight, glassVertices, glassIndices);
+    Engine::createRectangle(glassPositions, glassWidth, glassHeight, glassVertices, glassIndices, 1);
 	
     Engine::Transform glassTransform = {
         glm::vec3(1.0f, 1.0f, 1.0f),
@@ -152,9 +284,9 @@ void CreateAdvancedLightingScene(Engine::Object& floor, Engine::Object& wall, En
     Engine::Transform nanosuitTransform = {
         glm::vec3(10.0f, 10.0f, 10.0f),
         glm::vec3(0.0f, 0.0f, -70.0f),
-        glm::vec3(0.0f, 0.0f, 0.0f),
+        glm::vec3(-90.0f, 0.0f, 0.0f),
     };
-   model("res/assets/nanosuit_reflection/nanosuit.obj", false
+   model("res/assets/battlefield_4_-_u.s_engineer/scene.gltf", false
         , nanosuitTransform);
 	
     int modelAmbientSlot[1] = {4};
@@ -166,3 +298,4 @@ void CreateAdvancedLightingScene(Engine::Object& floor, Engine::Object& wall, En
     model.BindSpecularSlot(modelSpecularSlot, 1);
     model.BindNormalSlot(modelNormalSlot, 1);
 }
+#endif

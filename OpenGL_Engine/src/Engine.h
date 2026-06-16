@@ -17,3 +17,4 @@
 #include "SkyBox.h"
 #include "Random.h"
 #include "ShadowMapDirection.h"
+#include "PBRPipeline.h"

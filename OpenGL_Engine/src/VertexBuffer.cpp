@@ -18,7 +18,9 @@ Engine::VertexBuffer::~VertexBuffer()
 
 void Engine::VertexBuffer::SetBufferData(GLsizeiptr size_t, const void* data, unsigned int usage) const
 {
-    GLCALL(glBufferData(GL_ARRAY_BUFFER, size_t, data, usage));
+    // GLCALL(glBufferData(GL_ARRAY_BUFFER, size_t, data, usage));
+    GLCALL(glBufferData(GL_ARRAY_BUFFER, size_t, nullptr, usage));
+    GLCALL(glBufferSubData(GL_ARRAY_BUFFER, 0, size_t, data));
 }
 
 void Engine::VertexBuffer::Bind() const

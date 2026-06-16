@@ -17,8 +17,10 @@ Engine::Texture::Texture(uint32_t colorData) : m_FileName("Memory_Texture"), m_W
     GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
     GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));
     GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
-    // 直接把这 4 个字节当成像素数据传给 OpenGL
-    GLCALL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, &colorData));
+    // 1 x 1 的纹理为什么要用一个长度为4的数组呢？
+    // 根据 Gemini 的说法，虽然纹理只需要4字节的数据，但是GPU会一次性搬运16字节的数据，然后丢弃掉后面12字节，如果colorData后面没有数据可以给GPU搬了，就寄了
+    uint32_t colorDataSafe[4] = { colorData, colorData, colorData, colorData };
+    GLCALL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, colorDataSafe));
 }
 
 Engine::Texture::Texture(const std::string& fileName, bool bFlipVertical) : m_FileName(fileName)
@@ -53,6 +55,11 @@ Engine::Texture::Texture(const std::string& fileName, bool bFlipVertical) : m_Fi
         innerFormat = GL_RED;
         format = GL_RED;
     }
+    else if (m_BPP == 2)
+    {
+        innerFormat = GL_RG8;
+        format = GL_RG;
+    }
     else if (m_BPP == 3)
     {
         innerFormat = GL_RGB8;
@@ -74,6 +81,21 @@ Engine::Texture::Texture(const std::string& fileName, bool bFlipVertical) : m_Fi
     GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));/* 设置纹理的横向填充方式（纹理的横向比例与viewport比例不适配），GL_CLAMP_TO_EDGE 平铺 */
     GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));/* 设置纹理的竖向填充方式（纹理的竖向比例与viewport比例不适配），GL_CLAMP_TO_EDGE 平铺 */
     
+    if (m_BPP == 2)
+    {
+        GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, GL_RED));
+        GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_RED));
+        GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_B, GL_RED));
+        GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_GREEN));
+    }
+    else if (m_BPP == 1)
+    {
+        GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, GL_RED));
+        GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_RED));
+        GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_B, GL_RED));
+        GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ONE));
+    }
+        
     /* Send texture data to texture buffer */
     GLCALL(glTexImage2D(GL_TEXTURE_2D, 0, innerFormat, m_Width, m_Height, 0, format, GL_UNSIGNED_BYTE, textLocalBuffer));
     GLCALL(glGenerateMipmap(GL_TEXTURE_2D));

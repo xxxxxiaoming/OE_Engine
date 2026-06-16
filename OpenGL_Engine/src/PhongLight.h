@@ -55,7 +55,7 @@ namespace  Engine
         void ForwardRenderInternal(const Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
         void DeferredRenderInternal(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
     public:
-        PhongLight(int shadowMapResolution = 1024, bool bDeffered = false);
+        PhongLight(uint16_t renderResolutionX, uint16_t renderResolutionY, int shadowMapResolution = 1024, bool bDeffered = false);
         
         virtual void TurnOn(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
         virtual void TurnOff(Renderer& renderer) const;
