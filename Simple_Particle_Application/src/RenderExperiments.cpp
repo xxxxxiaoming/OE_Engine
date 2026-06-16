@@ -133,8 +133,8 @@ void PBRLighting(Engine::Renderer& renderer)
 	
 	/* Camera and controller */
 	// sphere camera setting
-	glm::vec3 camPostion = glm::vec3(0.0f, 0.0f, 20.0f);	  
-	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
+	glm::vec3 camPostion = glm::vec3(0.0f, 0.5f, 3.0f);	  
+	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 0.5f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
 	// nanosuit camera setting
 	// glm::vec3 camPostion = glm::vec3(0.0f, 100.0f, 230.0f);	  
 	// Engine::Camera cam{ camPostion, glm::vec3(0.0f, 55.0f, -100.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
@@ -142,7 +142,7 @@ void PBRLighting(Engine::Renderer& renderer)
 	// glm::vec3 camPostion = glm::vec3(0.0f, 20.0f, 10.0f); // backpack camera setting
 	// Engine::Camera cam{ camPostion, glm::vec3(0.0f, 25.0f, -100.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
 	Engine::CameraController camController{ renderer.GetGLFWwinow(), 10.0f, 10.0 };
-	glm::mat4 projectionMatrix{glm::perspective(glm::radians(45.0f), static_cast<float>(viewportW) / static_cast<float>(viewportH), 0.001f, 3000.0f)};
+	glm::mat4 projectionMatrix{glm::perspective(glm::radians(45.0f), static_cast<float>(viewportW) / static_cast<float>(viewportH), 0.1f, 3000.0f)};
 	
 	/* HDR render target */
 	bool bHDR = true;
@@ -204,16 +204,18 @@ void PBRLighting(Engine::Renderer& renderer)
 	// 	0.1f, 2000.0f
 	// );
 	
-	Engine::Object sphere;
-	CreatePBRMaterialSphere(sphere);
-	pbrPipeline.AddObject("sphere", &sphere);
+	// Engine::Object sphere;
+	// CreatePBRMaterialSphere(sphere);
+	// pbrPipeline.AddObject("sphere", &sphere);
 	
-	// Engine::Object floor;
-	// Engine::Model porsche_911;
-	// CreatePBRScene(floor, porsche_911);
+	Engine::Object floor;
+	Engine::Model porsche_911;
+	Engine::SkyBox skyBox;
+	CreatePBRScene(floor, porsche_911, skyBox);
 	
-	// pbrPipeline.AddObject("floor", &floor);
-	// pbrPipeline.AddModel("porsche_911", &porsche_911);
+	pbrPipeline.AddObject("floor", &floor);
+	pbrPipeline.AddModel("porsche_911", &porsche_911);
+	// pbrPipeline.AddSkyBox(&skyBox);
 	
 	double lastFrameTime = glfwGetTime();
 	while (!renderer.CheckWindowShouldClose())

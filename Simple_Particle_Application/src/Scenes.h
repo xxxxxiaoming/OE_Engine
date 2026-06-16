@@ -4,7 +4,7 @@
 
 #ifdef PBR_PIPELINE
     void CreatePBRMaterialSphere(Engine::Object& object);
-    void CreatePBRScene(Engine::Object& floor, Engine::Model& model);
+    void CreatePBRScene(Engine::Object& floor, Engine::Model& model, Engine::SkyBox& skyBox);
 #endif
 
 #ifdef BLING_PHONT_RENDERER

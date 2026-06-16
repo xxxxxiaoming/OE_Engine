@@ -22,6 +22,7 @@ struct Material {
     float metallicFactor;
     float roughnessFactor;
     float cutOff;
+    vec4 albedoFactor;
 };
 
 uniform Material u_Material;
@@ -67,7 +68,7 @@ void main()
     //normalVec = normalize(v_N);
 
     gN = normalVec * 0.5 + 0.5;
-    gAlbedo = vec4(texture(u_Material.albedo, v_TexCoord).rgb, 1.0);
+    gAlbedo = vec4(texture(u_Material.albedo, v_TexCoord).rgb, 1.0) * u_Material.albedoFactor;
     gEmissive = vec4(texture(u_Material.emissive, v_TexCoord).rgb, 1.0);
     gMetallicRoughnessAO = u_UseMRA ? 
                            vec4(texture(u_Material.metallic, v_TexCoord).b * u_Material.metallicFactor, texture(u_Material.roughness, v_TexCoord).g * u_Material.roughnessFactor, texture(u_Material.AO, v_TexCoord).r, 1.0) 

@@ -3,11 +3,11 @@
 #include "Helper.h"
 
 #ifdef PBR_PIPELINE
-void CreatePBRScene(Engine::Object& floor, Engine::Model& model)
+void CreatePBRScene(Engine::Object& floor, Engine::Model& model, Engine::SkyBox& skyBox)
 {
     // floor
-    constexpr float sizeX = 100.0f;
-    constexpr float sizeY = 100.0f;
+    constexpr float sizeX = 17.0f;
+    constexpr float sizeY = 17.0f;
     Engine::Vertex floorVertices[4];
     Engine::vec3 positions[1] = {
         Engine::vec3{-sizeX / 2.0f, -sizeY / 2.0f, 0.0f}
@@ -44,7 +44,7 @@ void CreatePBRScene(Engine::Object& floor, Engine::Model& model)
     std::string roughness;
     std::string ao;
     std::string normal;
-    Engine::PBRTexturePhaser(albedo, metallic, roughness, ao, normal, "res/texture/stone-house-siding-bl/", "stone-house-siding", "ogl");
+    Engine::PBRTexturePhaser(albedo, metallic, roughness, ao, normal, "res/texture/bare-wood1-bl/", "bare-wood1", "ogl");
     
     floor.m_TextureAlbedo.reserve(1);
     floor.m_TextureMetallic.reserve(1);
@@ -53,27 +53,34 @@ void CreatePBRScene(Engine::Object& floor, Engine::Model& model)
     floor.m_TextureNormal.reserve(1);
     floor.m_TextureEmissive.reserve(1);
     
-    floor.m_TextureAlbedo.emplace_back(0xFFFFFFFF);
-    floor.m_TextureMetallic.emplace_back(0xFF000000);
-    floor.m_TextureRoughness.emplace_back(0xFFFFFFFF);
+    floor.m_TextureAlbedo.emplace_back(albedo);
+    floor.m_TextureMetallic.emplace_back(metallic);
+    floor.m_TextureRoughness.emplace_back(roughness);
     floor.m_TextureAO.emplace_back(ao);
-    floor.m_TextureNormal.emplace_back(0xFF808080);
+    floor.m_TextureNormal.emplace_back(normal);
     floor.m_TextureEmissive.emplace_back(0xFF000000);
+    
+    floor.m_Material.metallicFactor = 1.0f;
+    floor.m_Material.roughnessFactor = 1.0f;
+    floor.m_Material.cutOff = 0.0f;
+    floor.m_UseMRA = false;
+    
+    skyBox("res/texture/Standard-Cube-Map/", ".hdr");
     
     Engine::Transform modelTransform = {
         glm::vec3(1.0f, 1.0f, 1.0f),
         glm::vec3(0.0f, 0.0f, 0.0f),
         glm::vec3(0.0f, 30.0f, 0.0f),
     };
-    model("res/assets/1969_ford_mustang_mach-1_428_cobra_jet/scene.gltf", false
+    model("res/assets/free_1975_porsche_911_930_turbo/scene.gltf", false
          , modelTransform);
     
     // Engine::Transform modelTransform = {
-    //     glm::vec3(0.05f, 0.05f, 0.05f),
+    //     glm::vec3(1.0f, 1.0f, 1.0f),
     //     glm::vec3(0.0f, 0.0f, 0.0f),
     //     glm::vec3(0.0f, 0.0f, 0.0f),
     // };
-    // model("res/assets/glTF-Sample-Models/Sponza/glTF/Sponza.gltf", false
+    // model("res/assets/glTF-Sample-Models/TransmissionTest/glTF/TransmissionTest.gltf", false
     //      , modelTransform);
 }
 
@@ -90,7 +97,7 @@ void CreatePBRMaterialSphere(Engine::Object& object)
     std::string roughness;
     std::string ao;
     std::string normal;
-    Engine::PBRTexturePhaser(albedo, metallic, roughness, ao, normal, "res/texture/Titanium-Scuffed-bl/", "Titanium-Scuffed", "ogl");
+    Engine::PBRTexturePhaser(albedo, metallic, roughness, ao, normal, "res/texture/worn-shiny-metal-bl/", "worn-shiny-metal", "ogl");
     
     constexpr int SECTORS = 64;
     constexpr int STACKS = 32;

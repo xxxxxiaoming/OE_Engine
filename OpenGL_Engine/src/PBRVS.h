@@ -35,3 +35,21 @@ void main() {
 	v_N = normalize(u_NormalMat * normal);
 }
 )glsl";
+
+// language=GLSL
+static const char skyBoxVS[] = R"glsl(
+#version 460 core
+
+layout(location = 0) in vec3 position;
+
+uniform mat4 u_View;
+uniform mat4 u_Projection;
+
+out vec3 v_TexCoord;
+
+void main() {
+	v_TexCoord = position;
+	vec4 projPos = u_Projection * u_View * vec4(position, 1.0);
+	gl_Position = projPos.xyww;
+}
+)glsl";

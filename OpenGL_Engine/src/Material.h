@@ -2,6 +2,7 @@
 
 #include "Shader.h"
 #include "EngineConfig.h"
+#include "Type.h"
 
 namespace Engine
 {
@@ -23,6 +24,7 @@ namespace Engine
 		float transmissionFactor = 0.0f;
 		float cutOff = 0.5f;
 		float ior = 1.5f;
+		vec4 albedoFactor{1.0f, 1.0f, 1.0f, 1.0f};
 		
 		void BindAlbedoSlots(int* slots, int slotsNum);
 		void BindRoughnessSlots(int* slots, int slotsNum);

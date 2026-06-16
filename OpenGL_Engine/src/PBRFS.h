@@ -31,6 +31,7 @@ struct Material {
     float roughnessFactor;
     float transmissionFactor;
     float ior;
+    vec4 albedoFactor;
 };
 
 /* 点光源 */
@@ -285,7 +286,7 @@ LightCombination calcSpotLight(vec3 albedo, float metallic, float roughness, vec
 }
 
 void main() {
-    vec4 albedoTex = texture(u_Material.albedo, v_TexCoord);
+    vec4 albedoTex = texture(u_Material.albedo, v_TexCoord) * u_Material.albedoFactor;
     vec3 albedo = albedoTex.rgb;
     float alpha = albedoTex.a;
 
@@ -343,16 +344,33 @@ void main() {
     float transmissionFraction = transmission * tirMask;
     vec3 finalTransmission = samplerBackground * albedo * transmissionFraction;
 
-    vec3 ambient = calcIBLLight(sampleNormal, -lookAtCamera_Normalized, albedo, roughness, metallic, mix(vec3(0.04), albedo, metallic)) * ao;
+    vec3 ambient = calcIBLLight(sampleNormal, lookAtCamera_Normalized, albedo, roughness, metallic, mix(vec3(0.04), albedo, metallic)) * ao;
 
-    directionLight = calcDirectionLight(albedo, metallic, roughness, sampleNormal, -lookAtCamera_Normalized);
-    pointLight = calcPointLight(albedo, metallic, roughness, sampleNormal, -lookAtCamera_Normalized);
-    spotLight = calcSpotLight(albedo, metallic, roughness, sampleNormal, -lookAtCamera_Normalized);
+    directionLight = calcDirectionLight(albedo, metallic, roughness, sampleNormal, lookAtCamera_Normalized);
+    pointLight = calcPointLight(albedo, metallic, roughness, sampleNormal, lookAtCamera_Normalized);
+    spotLight = calcSpotLight(albedo, metallic, roughness, sampleNormal, lookAtCamera_Normalized);
 
     diffuseLight = directionLight.diffuse + pointLight.diffuse + spotLight.diffuse;
     specularLight = directionLight.specular + pointLight.specular + spotLight.specular;
 
     color = vec4(ambient + specularLight + (1 - transmission) * diffuseLight + transmission * finalTransmission + emissive * 10.0, alpha); 
+}
+
+)glsl";
+
+// language=glsl
+static const char skyBoxFs[] = R"glsl(
+#version 460 core
+
+uniform samplerCube u_Cubemap;
+
+
+in vec3 v_TexCoord;
+out vec4 color;
+
+void main()
+{
+    color = texture(u_Cubemap, v_TexCoord);
 }
 
 )glsl";

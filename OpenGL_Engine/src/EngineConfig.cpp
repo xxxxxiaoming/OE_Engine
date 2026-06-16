@@ -53,7 +53,10 @@ namespace Engine
         
         24
         shaderLight brdf_lut
+        
+        25
+        Skybox cubemap
         */
-        extern const uint8_t ENGINE_RESERVE_TEXTURES_SLOT_NUM = 25;
+        extern const uint8_t ENGINE_RESERVE_TEXTURES_SLOT_NUM = 26;
     }
 }

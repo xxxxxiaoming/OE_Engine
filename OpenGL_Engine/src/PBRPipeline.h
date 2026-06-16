@@ -2,6 +2,7 @@
 #include "Shader.h"
 #include "ShadowMapDirection.h"
 #include "ShadowMapPoint.h"
+#include "SkyBox.h"
 
 namespace Engine
 {
@@ -16,6 +17,8 @@ namespace Engine
         
         ShadowMapDirection m_ShadowMap;
         std::vector<ShadowMapPoint>  m_ShadowMapPoint;
+        
+        SkyBox* m_SkyBox  = nullptr;
         
         int m_PointLightIndex = 0;
         int m_SpotLightIndex = 0;
@@ -70,6 +73,8 @@ namespace Engine
         void ConfigDirectionLight(const vec3& direction, const vec3& color);
         void EnableDirectionLight();
         void DisableDirectionLight();
+        
+        void AddSkyBox(SkyBox* skyBox) { m_SkyBox = skyBox;}
         
         bool AddPointLight(const vec3& position, const vec3& color, float constant = 1.0f, float linear = 0.0f, float quadratic = 0.0f);
         bool ConfigPointLightPosition(int index, const vec3& position);

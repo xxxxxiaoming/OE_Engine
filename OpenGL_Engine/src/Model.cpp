@@ -38,10 +38,12 @@ static Engine::BlendMode ProcessMeshBlendMode(const aiMaterial* material)
 	
 	bool hasTransmission = transmissionFactor > 0.01f;
 	bool hasMask = std::strcmp(aiModeString.C_Str(), "MASK") == 0;
+	bool hasBlend = std::strcmp(aiModeString.C_Str(), "BLEND") == 0;
+	bool isTransparent = opacity < 0.99f;
 	
 	if (hasTransmission && hasMask)
 		return Engine::BlendMode::TransparentMasked;
-	else if (hasTransmission)
+	else if (hasTransmission || hasBlend || isTransparent)
 		return Engine::BlendMode::Transparent;
 	else if (hasMask)
 		return Engine::BlendMode::Masked;
@@ -183,6 +185,7 @@ static void LoadMeshTexturePBRPipeline(aiMaterial* material, Engine::Object& obj
 		float metallicFactor = 0.0f;
 		float roughnessFactor =  1.0f;
 		float transmissionFactor = 0.0f;
+		aiColor4D basecolorFactor{1.0f, 1.0f, 1.0f, 1.0f};
 		float ior = 1.5f;
 		
 		object.m_TextureAlbedo.reserve(4);
@@ -193,6 +196,8 @@ static void LoadMeshTexturePBRPipeline(aiMaterial* material, Engine::Object& obj
 		object.m_TextureEmissive.reserve(4);
 		
 		// Albedo
+		material->Get(AI_MATKEY_BASE_COLOR, basecolorFactor);
+		object.m_Material.albedoFactor = {basecolorFactor.r, basecolorFactor.g, basecolorFactor.b, basecolorFactor.a};
 		if (material->GetTexture(AI_MATKEY_BASE_COLOR_TEXTURE, &albedo) == AI_SUCCESS)
 		{
 			std::string fullPath = assetDirectory + albedo.C_Str();
@@ -200,23 +205,7 @@ static void LoadMeshTexturePBRPipeline(aiMaterial* material, Engine::Object& obj
 		}
 		else
 		{
-			aiColor4D baseColor(1.0f, 1.0f, 1.0f, 1.0f);
-                
-			// 1. 优先读取现代 Assimp PBR 颜色因子，若失败则回退到 Diffuse
-			if (material->Get(AI_MATKEY_BASE_COLOR, baseColor) != AI_SUCCESS)
-			{
-				material->Get(AI_MATKEY_COLOR_DIFFUSE, baseColor);
-			}
-                
-			// 2. 关键核心：强制读取被 Assimp 拆分出去的透明度因子（Opacity）
-			float opacity = 1.0f;
-			if (material->Get(AI_MATKEY_OPACITY, opacity) == AI_SUCCESS)
-			{
-				baseColor.a = opacity;
-			}
-                
-			// 3. 生成包含正确透明度 Alpha 的 1x1 纯色兜底贴图
-			object.m_TextureAlbedo.emplace_back(ColorToRGBA(baseColor));
+			object.m_TextureAlbedo.emplace_back(0xFFFFFFFF);
 		}
 		
 		// Roughness

@@ -108,6 +108,7 @@ void Engine::Object::OnDraw()
 	m_Material.shader->SetUniform1i("u_UseMRA", m_UseMRA);
 	m_Material.shader->SetUniform1f("u_Material.metallicFactor", m_Material.metallicFactor);
 	m_Material.shader->SetUniform1f("u_Material.roughnessFactor", m_Material.roughnessFactor);
+	m_Material.shader->SetUniform4f("u_Material.albedoFactor", m_Material.albedoFactor.r, m_Material.albedoFactor.g, m_Material.albedoFactor.b, m_Material.albedoFactor.a);
 	
 	if (GetBlendMode() == BlendMode::Transparent)
 	{

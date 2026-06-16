@@ -89,8 +89,9 @@ static void LoadIBLTexture(const std::string& irradiance, const std::string& rad
         glGenTextures(1, &texID);
         glBindTexture(GL_TEXTURE_2D, texID);
 
+        // GLenum innerformat = (nrChannels == 4) ? GL_RGBA16F : GL_RGB16F;
         GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, format, GL_UNSIGNED_BYTE, data);
 
         // 致命设置：防止粗糙度为 1.0 时采样越界产生亮边
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -550,6 +551,11 @@ void Engine::PBRPipeline::TurnOn(Renderer& renderer, const glm::mat4& viewMatrix
     GLCALL(glBlitFramebuffer(0, 0, bufferSizeX, bufferSizeY, 0, 0, bufferSizeX, bufferSizeY, GL_DEPTH_BUFFER_BIT, GL_NEAREST));
     GLCALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
     
+    m_RTLight.BindFramebuffer();
+    if (m_SkyBox != nullptr)
+        m_SkyBox->Draw();
+    m_RTLight.UnbindFramebuffer();
+    
     GLCALL(glBindTextureUnit(0, m_FRBackgroundTexture));
     GLCALL(glBindFramebuffer(GL_READ_FRAMEBUFFER, m_RTLight.GetFBO()));
     GLCALL(glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, bufferSizeX, bufferSizeY));
@@ -857,6 +863,11 @@ void Engine::PBRPipeline::ConfigMVPMatrix(const glm::mat4& modelMatrix, const gl
     
     m_ShaderSSAO.SetUniformMatrix4f("u_View", viewMatrix);
     m_ShaderSSAO.SetUniformMatrix4f("u_Projection", projectionMatrix);
+    
+    if (m_SkyBox != nullptr)
+    {
+        m_SkyBox->SetVPMatrix(viewMatrix, projectionMatrix);
+    }
 }
 
 void Engine::PBRPipeline::ConfigNormalMatrix(const glm::mat3& normalMatrix)
