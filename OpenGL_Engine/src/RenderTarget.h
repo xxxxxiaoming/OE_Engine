@@ -12,7 +12,7 @@ namespace Engine
 		int m_Width;
 		int m_Height;
 		
-		std::vector<uint32_t> m_ColorAttachments{0,0,0,0,0};
+		std::vector<uint32_t> m_ColorAttachments{0,0,0,0,0,0};
 		
 		uint32_t m_FBO = 0;
 		uint32_t m_DepthAttachment = 0;
@@ -53,6 +53,8 @@ namespace Engine
 		uint32_t GetTextureBuffer(int slot = 0) const {return m_ColorAttachments[slot];}
 		uint32_t GetDepthBuffer() const {return m_DepthAttachment;}
 		uint32_t GetCubeDepthBuffer() const {return m_DepthCubeAttachment;}
+		
+		void GetRTSize(int& width, int& height) const {width = m_Width; height = m_Height;}
 		
 		bool CheckEnableHDR() const {return m_bEnableHDR;}
 		

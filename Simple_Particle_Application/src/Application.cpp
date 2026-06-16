@@ -2,16 +2,17 @@
 
 int main()
 {
-	Engine::Renderer renderer{ 1280, 720, "Hello OpenGL!" };
+	Engine::Renderer renderer{ 1920, 1080, "Hello OpenGL!" };
 
 	renderer.EnableBlend();
 	renderer.EnableDepthTest();
 
-	//StencilTestExperiment(std::string{ "res/assets/backpack/backpack.obj" }, renderer);
+	// StencilTestExperiment(std::string{ "res/assets/backpack/backpack.obj" }, renderer);
 	// RenderTargetExperiment(renderer);
 	// DrawASimpleHouseUsingGS(renderer);
 	// InstanceExperiment(renderer);
-	AdvancedLighting(renderer);
+	//AdvancedLighting(renderer);
+	PBRLighting(renderer);
 	renderer.Clear();
 	return 0;
 }

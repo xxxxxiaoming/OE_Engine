@@ -1,185 +1,69 @@
-﻿#include "Model.h"
+#include "Model.h"
 
 
 #include <assimp/postprocess.h>
 #include <assimp/vector3.h>
-#include <mikktspace.h>
+#include <assimp/GltfMaterial.h>
 
 #include <cstdlib>
 
 #include "Material.h"
 #include "Type.h"
+#include "EngineConfig.h"
+#include "Helper.h"
 
-// 定义一个临时结构体，把你的网格数据传进去
-struct MikkMeshData
+static uint32_t ColorToRGBA(const aiColor4D& color)
 {
-	Engine::Vertex* vertices;
-	uint32_t*       indices;
-	size_t          indexCount;
-	uint8_t         indicesOfOneFace;
-};
+	uint8_t r = static_cast<uint8_t>(std::clamp(color.r, 0.0f, 1.0f) * 255.0f);
+	uint8_t g = static_cast<uint8_t>(std::clamp(color.g, 0.0f, 1.0f) * 255.0f);
+	uint8_t b = static_cast<uint8_t>(std::clamp(color.b, 0.0f, 1.0f) * 255.0f);
+	uint8_t a = static_cast<uint8_t>(std::clamp(color.a, 0.0f, 1.0f) * 255.0f);
 
-void CalcMikkTSpaceTangents(Engine::Vertex* vertices, uint32_t* indices, uint8_t indicesPerFace, size_t indexCount)
-{
-
-    MikkMeshData meshData{ vertices, indices, indexCount, indicesPerFace };
-
-    SMikkTSpaceInterface iface{};
-
-    iface.m_getNumFaces = [](const SMikkTSpaceContext* ctx) -> int {
-        auto* data = static_cast<MikkMeshData*>(ctx->m_pUserData);
-        return (int)data->indexCount / data->indicesOfOneFace;
-    };
-
-    iface.m_getNumVerticesOfFace = [](const SMikkTSpaceContext* ctx, const int) -> int {
-    	auto* data = static_cast<MikkMeshData*>(ctx->m_pUserData);
-        return data->indicesOfOneFace;
-    };
-
-    iface.m_getPosition = [](const SMikkTSpaceContext* ctx, float out[], const int iFace, const int iVert) {
-        auto* data = static_cast<MikkMeshData*>(ctx->m_pUserData);
-        const auto& pos = data->vertices[data->indices[iFace * data->indicesOfOneFace + iVert]].pos;
-        out[0] = pos.x; out[1] = pos.y; out[2] = pos.z;
-    };
-
-    iface.m_getNormal = [](const SMikkTSpaceContext* ctx, float out[], const int iFace, const int iVert) {
-        auto* data = static_cast<MikkMeshData*>(ctx->m_pUserData);
-        const auto& n = data->vertices[data->indices[iFace * data->indicesOfOneFace + iVert]].normal;
-        out[0] = n.x; out[1] = n.y; out[2] = n.z;
-    };
-
-    iface.m_getTexCoord = [](const SMikkTSpaceContext* ctx, float out[], const int iFace, const int iVert) {
-        auto* data = static_cast<MikkMeshData*>(ctx->m_pUserData);
-        const auto& uv = data->vertices[data->indices[iFace * data->indicesOfOneFace + iVert]].texCoord;
-        out[0] = uv.x; out[1] = uv.y;
-    };
-
-    iface.m_setTSpaceBasic = [](const SMikkTSpaceContext* ctx, const float tangent[], const float fSign, const int iFace, const int iVert) {
-        auto* data = static_cast<MikkMeshData*>(ctx->m_pUserData);
-        auto& vert = data->vertices[data->indices[iFace * data->indicesOfOneFace + iVert]];
-        vert.tangent   = Engine::vec3{tangent[0], tangent[1], tangent[2]};
-        vert.bitangent = Engine::vec3{fSign, 0.0f, 0.0f};
-    };
-
-    SMikkTSpaceContext ctx{};
-    ctx.m_pInterface = &iface;
-    ctx.m_pUserData  = &meshData;
-
-    genTangSpaceDefault(&ctx);
+	// 对应小端序内存布局：低字节到高字节分别为 R, G, B, A
+	return (a << 24) | (b << 16) | (g << 8) | r;
 }
 
 static Engine::BlendMode ProcessMeshBlendMode(const aiMaterial* material)
 {
+	// 第一优先级：检查是否有 transmission（不管 alphaMode 是什么）
+	float transmissionFactor = 0.0f;
+	material->Get(AI_MATKEY_TRANSMISSION_FACTOR, transmissionFactor);
+
+	// 第二优先级：检查 alphaMode
 	aiString aiModeString;
-	if (material->Get("$mat.gltf.alphaMode", 0, 0, aiModeString) == AI_SUCCESS)
-	{
-		if (std::strcmp(aiModeString.C_Str(), "BLEND") == 0)
-			return Engine::BlendMode::Transparent;
-		else if (std::strcmp(aiModeString.C_Str(), "MASK") == 0)
-			return Engine::BlendMode::Masked;
-		else
-			return Engine::BlendMode::Opaque;
-	}
+	material->Get(AI_MATKEY_GLTF_ALPHAMODE, aiModeString);
 	
 	float opacity = 1.0f;
-	if (material->Get(AI_MATKEY_OPACITY, opacity) == AI_SUCCESS)
-	{
-		if (opacity < 1.0f)
-			return Engine::BlendMode::Transparent;
-		else
-			return Engine::BlendMode::Opaque;
-	}
+	material->Get(AI_MATKEY_OPACITY, opacity);
 	
-	int blendMode = 0;
-	if (material->Get(AI_MATKEY_BLEND_FUNC, blendMode) == AI_SUCCESS)
-	{
-		if (blendMode == aiBlendMode_Additive)
-			return Engine::BlendMode::Transparent;
-		else
-			return Engine::BlendMode::Opaque;
-	}
+	bool hasTransmission = transmissionFactor > 0.01f;
+	bool hasMask = std::strcmp(aiModeString.C_Str(), "MASK") == 0;
+	bool hasBlend = std::strcmp(aiModeString.C_Str(), "BLEND") == 0;
+	bool isTransparent = opacity < 0.99f;
 	
-	return Engine::BlendMode::Opaque;
+	if (hasTransmission && hasMask)
+		return Engine::BlendMode::TransparentMasked;
+	else if (hasTransmission || hasBlend || isTransparent)
+		return Engine::BlendMode::Transparent;
+	else if (hasMask)
+		return Engine::BlendMode::Masked;
+	else 
+		return Engine::BlendMode::Opaque;
 }
 
-Engine::Part::Part(const aiNode* node, const aiScene* scene, uint8_t indicesOfOneFace, std::string& assetDirectory, std::string& format) :
-	indicesPerFace(indicesOfOneFace)
+static glm::mat4 aiMatrix4x4ToGlm(const aiMatrix4x4& from)
 {
-	objects.reserve(node->mNumMeshes);
-	for (uint32_t index = 0; index < node->mNumMeshes; index++)
-	{
-		uint32_t meshIndex = node->mMeshes[index];
-		aiMesh* mesh = scene->mMeshes[meshIndex];
-		ProcessMesh(mesh, scene, assetDirectory, format);
-	}
-
-	name = node->mName.C_Str();
+	glm::mat4 to;
+	to[0][0] = from.a1; to[1][0] = from.a2; to[2][0] = from.a3; to[3][0] = from.a4;
+	to[0][1] = from.b1; to[1][1] = from.b2; to[2][1] = from.b3; to[3][1] = from.b4;
+	to[0][2] = from.c1; to[1][2] = from.c2; to[2][2] = from.c3; to[3][2] = from.c4;
+	to[0][3] = from.d1; to[1][3] = from.d2; to[2][3] = from.d3; to[3][3] = from.d4;
+	return to;
 }
 
-void Engine::Part::ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& assetDirectory, std::string& format)
+#ifdef BLING_PHONG_PIPELINE
+static void LoadMeshTexturesBlingPhongPipeline(aiMaterial* material, Engine::Object& object, const std::string& format, const::std string& assetDirectory)
 {
-	if (!mesh->HasPositions())
-		return;
-
-	Vertex* vertices = static_cast<Vertex*>(std::malloc(sizeof(Vertex) * mesh->mNumVertices));
-	
-	for (uint32_t count = 0; count < mesh->mNumVertices; count++)
-	{
-		aiVector3D& aiVertex = mesh->mVertices[count];
-		vertices[count].pos = vec3{ aiVertex.x, aiVertex.y, aiVertex.z };
-
-		if (mesh->HasNormals())
-		{
-			aiVector3D& aiNormal = mesh->mNormals[count];
-			vertices[count].normal = vec3{ aiNormal.x, aiNormal.y, aiNormal.z };
-		}
-
-		if (mesh->HasTextureCoords(0))
-		{
-			aiVector3D aiTextureCoord = mesh->mTextureCoords[0][count];
-			vertices[count].texCoord = vec2{ aiTextureCoord.x, aiTextureCoord.y };
-		}
-
-		if (mesh->HasVertexColors(0))
-		{
-			aiColor4D aiVertexColor = mesh->mColors[0][count];
-			vertices[count].color = vec4{ aiVertexColor.r, aiVertexColor.g, aiVertexColor.b, aiVertexColor.a };
-		}
-		
-		if (indicesPerFace < 3 && mesh->HasTangentsAndBitangents())
-		// if (mesh->HasTangentsAndBitangents())
-		{
-			aiVector3D aiTangent = mesh->mTangents[count];
-			aiVector3D aiBitangent = mesh->mBitangents[count];
-			vertices[count].bitangent = vec3{ aiBitangent.x, aiBitangent.y, aiBitangent.z };
-			vertices[count].tangent = vec3{ aiTangent.x, aiTangent.y, aiTangent.z };
-		}
-
-		vertices[count].textureSlot = 0.0f;
-	}
-
-	uint32_t* indices = static_cast<uint32_t*>(std::malloc(sizeof(uint32_t) * mesh->mNumFaces * indicesPerFace));
-	assert(indices != nullptr);
-	
-	for (uint32_t count = 0; count < mesh->mNumFaces; count++)
-	{
-		aiFace face = mesh->mFaces[count];
-		for(int index = 0; index < indicesPerFace; index ++)
-			indices[count * indicesPerFace + index] = face.mIndices[index];
-	}
-	
-	// if (false)
-	if (indicesPerFace >= 3)
-		// Attention pls! MikkTSpace 只支持计算三角形/四边形片元的切线空间
-		CalcMikkTSpaceTangents(vertices, indices, indicesPerFace, mesh->mNumFaces * indicesPerFace);
-	
-	objects.emplace_back(vertices, indices, mesh->mNumVertices, mesh->mNumFaces * indicesPerFace, assetDirectory);
-
-	/* Load textures */
-	uint32_t materialIndex = mesh->mMaterialIndex;
-	Object& object = objects.back();
-		
-	aiMaterial* material = scene->mMaterials[materialIndex];
 	uint32_t ambientNum = material->GetTextureCount(aiTextureType_AMBIENT);
 	uint32_t diffuseNum = material->GetTextureCount(aiTextureType_DIFFUSE);
 	uint32_t specularNum = material->GetTextureCount(aiTextureType_SPECULAR);
@@ -234,7 +118,7 @@ void Engine::Part::ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& 
 		{
 			/* 没有高光贴图的mesh绑定一张纯黑的默认贴图 */
 			object.m_TextureSpecular.reserve(1);
-			object.m_TextureSpecular.emplace_back("res/texture/default_specular.jpg");	
+			object.m_TextureSpecular.emplace_back(0xFF000000);	
 		}
 	}
 	else
@@ -249,10 +133,17 @@ void Engine::Part::ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& 
 	}
 	
 	/* 法线贴图 */
-	if (format == "obj")
+	if (format == "obj" || format == "gltf")
 	{
-		uint32_t normalNum = material->GetTextureCount(aiTextureType_HEIGHT);
+		aiTextureType flag = aiTextureType_NORMALS;
+		uint32_t normalNum = material->GetTextureCount(flag);
 		normalNum = normalNum > MAX_TEXTURES ? MAX_TEXTURES : normalNum;
+		
+		if (normalNum == 0)
+		{
+			flag = aiTextureType_NORMALS;
+			normalNum = material->GetTextureCount(flag);
+		}
 		
 		if (normalNum > 0)
 		{
@@ -261,7 +152,7 @@ void Engine::Part::ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& 
 			{
 				aiString path;
 				std::string fullPath = assetDirectory;
-				material->GetTexture(aiTextureType_HEIGHT, count, &path);
+				material->GetTexture(flag, count, &path);
 				object.m_TextureNormal.emplace_back(fullPath.append(path.C_Str()));
 			}
 		}
@@ -275,11 +166,234 @@ void Engine::Part::ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& 
 	{
 		// TODO : Deal with other formats
 	}
-	
-	object.SetBlendMode(ProcessMeshBlendMode(material));
+}
+#endif
 
-	std::free(vertices);
-	std::free(indices);
+#ifdef PBR_PIPELINE
+static void LoadMeshTexturePBRPipeline(aiMaterial* material, Engine::Object& object, const std::string& format, const std::string& assetDirectory)
+{
+	if (format == "gltf")
+	{
+		aiString albedo;
+		aiString roughness;
+		aiString metallic;
+		aiString occlusion;
+		aiString normal;
+		aiString emissive;
+		aiString transmission;
+		
+		float metallicFactor = 0.0f;
+		float roughnessFactor =  1.0f;
+		float transmissionFactor = 0.0f;
+		aiColor4D basecolorFactor{1.0f, 1.0f, 1.0f, 1.0f};
+		float ior = 1.5f;
+		
+		object.m_TextureAlbedo.reserve(4);
+		object.m_TextureRoughness.reserve(4);
+		object.m_TextureMetallic.reserve(4);
+		object.m_TextureAO.reserve(4);
+		object.m_TextureNormal.reserve(4);
+		object.m_TextureEmissive.reserve(4);
+		
+		// Albedo
+		material->Get(AI_MATKEY_BASE_COLOR, basecolorFactor);
+		object.m_Material.albedoFactor = {basecolorFactor.r, basecolorFactor.g, basecolorFactor.b, basecolorFactor.a};
+		if (material->GetTexture(AI_MATKEY_BASE_COLOR_TEXTURE, &albedo) == AI_SUCCESS)
+		{
+			std::string fullPath = assetDirectory + albedo.C_Str();
+			object.m_TextureAlbedo.emplace_back(fullPath);
+		}
+		else
+		{
+			object.m_TextureAlbedo.emplace_back(0xFFFFFFFF);
+		}
+		
+		// Roughness
+		material->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessFactor);
+		object.m_Material.roughnessFactor = roughnessFactor;
+		if (material->GetTexture(AI_MATKEY_ROUGHNESS_TEXTURE, &roughness) == AI_SUCCESS)
+		{
+			std::string fullPath = assetDirectory + roughness.C_Str();
+			object.m_TextureRoughness.emplace_back(fullPath);
+		}
+		else
+		{
+			object.m_TextureRoughness.emplace_back(0xFFFFFFFF);
+		}
+		
+		// Metallic
+		material->Get(AI_MATKEY_METALLIC_FACTOR, metallicFactor);
+		object.m_Material.metallicFactor = metallicFactor;
+		if (material->GetTexture(AI_MATKEY_METALLIC_TEXTURE, &metallic) == AI_SUCCESS)
+		{
+			std::string fullPath = assetDirectory + metallic.C_Str();
+			object.m_TextureMetallic.emplace_back(fullPath);
+		}
+		else
+		{
+			object.m_TextureMetallic.emplace_back(0xFFFFFFFF);
+		}
+		
+		// Transmission
+		if (object.GetBlendMode() == Engine::BlendMode::Transparent)
+		{
+			if (material->GetTexture(AI_MATKEY_TRANSMISSION_TEXTURE, &transmission) == AI_SUCCESS)
+			{
+				std::string fullPath = assetDirectory + transmission.C_Str();
+				object.m_TextureTransmission.emplace_back(fullPath);
+			}
+			else
+			{
+				object.m_TextureTransmission.emplace_back(0xFFFFFFFF);
+			}
+			
+			material->Get(AI_MATKEY_REFRACTI, ior);
+			material->Get(AI_MATKEY_TRANSMISSION_FACTOR, transmissionFactor);
+			object.m_Material.transmissionFactor = transmissionFactor;
+			object.m_Material.ior = ior;
+		}
+		
+		if (material->GetTexture(aiTextureType_AMBIENT_OCCLUSION, 0, &occlusion) == AI_SUCCESS)
+		{
+			std::string fullPath = assetDirectory + occlusion.C_Str();
+			object.m_TextureAO.emplace_back(fullPath);
+		}
+		else
+		{
+			object.m_TextureAO.emplace_back(0xFFFFFFFF);
+		}
+		
+		if (material->GetTexture(aiTextureType_NORMALS, 0, &normal) == AI_SUCCESS)
+		{
+			std::string fullPath = assetDirectory + normal.C_Str();
+			object.m_TextureNormal.emplace_back(fullPath);
+		}
+		else
+		{
+			object.m_TextureNormal.emplace_back(0xFFFF8080);
+		}
+		
+		if (material->GetTexture(aiTextureType_EMISSIVE, 0, &emissive) == AI_SUCCESS)
+		{
+			std::string fullPath = assetDirectory + emissive.C_Str();
+			object.m_TextureEmissive.emplace_back(fullPath);
+		}
+		else
+		{
+			object.m_TextureEmissive.emplace_back(0xFF000000);
+		}
+		
+		// gltf格式模型，metallic/roughness/ao 三者共用一张贴图
+		object.m_UseMRA = (format == "gltf" ? true : false );
+	}
+	else
+	{
+		// TODO : process with other formats.
+	}
+}
+#endif
+
+Engine::Part::Part(const aiNode* node, const aiScene* scene, uint8_t indicesOfOneFace, std::string& assetDirectory, std::string& format) :
+	indicesPerFace(indicesOfOneFace)
+{
+	objects.reserve(node->mNumMeshes);
+	for (uint32_t index = 0; index < node->mNumMeshes; index++)
+	{
+		uint32_t meshIndex = node->mMeshes[index];
+		aiMesh* mesh = scene->mMeshes[meshIndex];
+		ProcessMesh(mesh, scene, assetDirectory, format, node);
+	}
+
+	name = node->mName.C_Str();
+}
+
+void Engine::Part::ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& assetDirectory, std::string& format, const aiNode* node)
+{
+	if (!mesh->HasPositions())
+		return;
+
+	std::vector<Vertex> vertices(mesh->mNumVertices);
+	
+	for (uint32_t count = 0; count < mesh->mNumVertices; count++)
+	{
+		aiVector3D& aiVertex = mesh->mVertices[count];
+		vertices[count].pos = vec3{ aiVertex.x, aiVertex.y, aiVertex.z };
+
+		if (mesh->HasNormals())
+		{
+			aiVector3D& aiNormal = mesh->mNormals[count];
+			vertices[count].normal = vec3{ aiNormal.x, aiNormal.y, aiNormal.z };
+		}
+
+		if (mesh->HasTextureCoords(0))
+		{
+			aiVector3D aiTextureCoord = mesh->mTextureCoords[0][count];
+			vertices[count].texCoord = vec2{ aiTextureCoord.x, aiTextureCoord.y };
+		}
+
+		if (mesh->HasVertexColors(0))
+		{
+			aiColor4D aiVertexColor = mesh->mColors[0][count];
+			vertices[count].color = vec4{ aiVertexColor.r, aiVertexColor.g, aiVertexColor.b, aiVertexColor.a };
+		}
+		
+		vertices[count].tangent = vec4{ 0.0f, 0.0f, 0.0f, 0.0f };
+		vertices[count].textureSlot = 0.0f;
+	}
+
+	std::vector<uint32_t> indices(mesh->mNumFaces * indicesPerFace);
+	
+	for (uint32_t count = 0; count < mesh->mNumFaces; count++)
+	{
+		aiFace face = mesh->mFaces[count];
+		for(int index = 0; index < indicesPerFace; index ++)
+		{
+			if (index < face.mNumIndices)
+				indices[count * indicesPerFace + index] = face.mIndices[index];
+			else
+				indices[count * indicesPerFace + index] = 0;
+		}
+	}
+	
+	if (indicesPerFace >= 3)
+		CalcMikkTSpaceTangents(vertices, indices, indicesPerFace);
+	
+	printf("Process Mesh: %s of Node: %s, data: %d vertices, %d faces, %d vertex indices\n", mesh->mName.C_Str(), node->mName.C_Str(), vertices.size(), mesh->mNumFaces, indices.size());
+	
+	objects.emplace_back(vertices.data(), indices.data(), static_cast<uint32_t>(vertices.size()), static_cast<uint32_t>(indices.size()), assetDirectory);
+	fflush(stdout);
+	
+	/* Load textures */
+	uint32_t materialIndex = mesh->mMaterialIndex;
+	Object& object = objects.back();
+		
+	aiMaterial* material = nullptr;
+	if (scene->mMaterials != nullptr && materialIndex < scene->mNumMaterials)
+	{
+		material = scene->mMaterials[materialIndex];
+	}
+	
+	if(material != nullptr)
+	{
+		object.SetBlendMode(ProcessMeshBlendMode(material));
+		
+		if (object.GetBlendMode() != BlendMode::Transparent)
+		{
+			float cutoff = 0.5f;
+			material->Get(AI_MATKEY_GLTF_ALPHACUTOFF, cutoff);
+			object.m_Material.cutOff = cutoff;
+		}
+		
+#ifdef PBR_PIPELINE
+		LoadMeshTexturePBRPipeline(material, object, format, assetDirectory);
+#elif defined(BLING_PHONG_PIPELINE)
+		LoadMeshTexturesBlingPhongPipeline(material, object, format, assetDirectory);
+#endif
+	}
+	else
+	{
+		object.SetBlendMode(BlendMode::Opaque);
+	}
 }
 
 void Engine::Part::DestroyPart()
@@ -319,6 +433,8 @@ Engine::Model::Model(const std::string& path, bool bFlipUV, const Transform& tra
 {
 	printf("Loading ...\n");
 	Assimp::Importer importer;
+	// importer.SetPropertyInteger(AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT);
+	// uint32_t importFlags = aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_SortByPType;
 	uint32_t importFlags = aiProcess_Triangulate | aiProcess_GenSmoothNormals;
 	
 	if (bFlipUV)
@@ -332,7 +448,7 @@ Engine::Model::Model(const std::string& path, bool bFlipUV, const Transform& tra
 
 	std::string assetDirectory = path.substr(0, path.find_last_of('/') + 1);
 	std::string format = path.substr(path.find_last_of('.') + 1);
-	ProcessNode(scene->mRootNode, scene, assetDirectory, format);
+	ProcessNode(scene->mRootNode, scene, glm::mat4{1.0f}, assetDirectory, format);
 
 	printf("Loading completed\n");
 }
@@ -345,6 +461,8 @@ Engine::Model& Engine::Model::operator()(const std::string& path, bool bFlipUV, 
 	
 	printf("Loading ...\n");
 	Assimp::Importer importer;
+	// importer.SetPropertyInteger(AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT);
+	// uint32_t importFlags = aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_SortByPType;
 	uint32_t importFlags = aiProcess_Triangulate | aiProcess_GenSmoothNormals;
 	
 	if (bFlipUV)
@@ -358,19 +476,22 @@ Engine::Model& Engine::Model::operator()(const std::string& path, bool bFlipUV, 
 
 	std::string assetDirectory = path.substr(0, path.find_last_of('/') + 1);
 	std::string format = path.substr(path.find_last_of('.') + 1);
-	ProcessNode(scene->mRootNode, scene, assetDirectory, format);
+	ProcessNode(scene->mRootNode, scene, glm::mat4{1.0f}, assetDirectory, format);
 
 	printf("Loading completed\n");
 	
 	return *this;
 }
 
-void Engine::Model::ProcessNode(const aiNode* node, const aiScene* scene, std::string& assetDirectory, std::string& format)
+void Engine::Model::ProcessNode(const aiNode* node, const aiScene* scene, const glm::mat4& parentTransform, std::string& assetDirectory, std::string& format)
 {
-	printf("Process Node: %s\n", node->mName.C_Str());
+	glm::mat4 localMat = aiMatrix4x4ToGlm(node->mTransformation);
+	glm::mat4 globalMat = parentTransform * localMat;
 	m_Parts.emplace_back(node, scene, 3, assetDirectory, format);
+	m_Parts.back().localTransform = globalMat;
+	
 	for (uint32_t count = 0; count < node->mNumChildren; count++)
-		ProcessNode(node->mChildren[count], scene, assetDirectory, format);
+		ProcessNode(node->mChildren[count], scene, globalMat, assetDirectory, format);
 }
 
 void Engine::Model::GetChildrenNum(aiNode* node, uint32_t& count)
@@ -405,6 +526,38 @@ void Engine::Model::BindShader(Shader* shader)
 			object.m_Material.shader = shader;
 }
 
+#ifdef PBR_PIPELINE
+void Engine::Model::BindAlbedoSlot(int* slots, int slotsNum)
+{
+	for (auto& part : m_Parts)
+		for (auto& object : part.objects)
+			object.m_Material.BindAlbedoSlots(slots, slotsNum);
+}
+
+void Engine::Model::BindMetallicSlots(int* slots, int slotsNum)
+{
+	for (auto& part : m_Parts)
+		for (auto& object : part.objects)
+			object.m_Material.BindMetallicSlots(slots, slotsNum);
+}
+
+
+void Engine::Model::BindRoughnessSlots(int* slots, int slotsNum)
+{
+	for (auto& part : m_Parts)
+		for (auto& object : part.objects)
+			object.m_Material.BindRoughnessSlots(slots, slotsNum);
+}
+
+void Engine::Model::BindAOSlots(int* slots, int slotsNum)
+{
+	for (auto& part : m_Parts)
+		for (auto& object : part.objects)
+			object.m_Material.BindAOSlots(slots, slotsNum);
+}
+
+#elif defined(BLING_PHONG_PIPELINE)
+
 void Engine::Model::BindAmbientSlot(int* slots, int slotsNum)
 {
 	for (auto& part : m_Parts)
@@ -419,12 +572,15 @@ void Engine::Model::BindDiffuseSlot(int* slots, int slotsNum)
 			object.m_Material.BindDiffuseSlots(slots, slotsNum);
 }
 
+
 void Engine::Model::BindSpecularSlot(int* slots, int slotsNum)
 {
 	for (auto& part : m_Parts)
 		for (auto& object : part.objects)
 			object.m_Material.BindSpecularSlots(slots, slotsNum);
 }
+
+#endif
 
 void Engine::Model::BindNormalSlot(int* slots, int slotsNum)
 {

@@ -19,6 +19,10 @@ Engine::IndexBuffer::~IndexBuffer()
 void Engine::IndexBuffer::SetBufferData(GLsizeiptr size_t, const void* data, unsigned int usage) const
 {
     GLCALL(glBufferData(GL_ELEMENT_ARRAY_BUFFER, size_t, data, usage));
+    if (data != nullptr)
+    {
+        GLCALL(glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, size_t, data));
+    }
 }
 
 void Engine::IndexBuffer::Bind() const

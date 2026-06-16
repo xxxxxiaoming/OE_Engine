@@ -1,17 +1,12 @@
 #pragma once
 #include "Shader.h"
-#include "Model.h"
 #include "ShadowMapDirection.h"
 #include "ShadowMapPoint.h"
-#include "Type.h"
+#include "SkyBox.h"
 
-namespace  Engine
+namespace Engine
 {
-    /* 
-     * 4个点光源的深度cubemap依次绑定到1，2，3，4这四个纹理槽位
-     * 0，1，2，3，4这个5个纹理槽位是Engine保留的，不会被 Application 占用
-     */
-    class PhongLight
+    class PBRPipeline
     {
     private:
         Shader m_ShaderLight;
@@ -19,13 +14,17 @@ namespace  Engine
         Shader m_ShaderGBuffer;
         Shader m_ShaderSSAO;
         Shader m_ShaderSSAOSmoth;
+        
         ShadowMapDirection m_ShadowMap;
         std::vector<ShadowMapPoint>  m_ShadowMapPoint;
+        
+        SkyBox* m_SkyBox  = nullptr;
+        
         int m_PointLightIndex = 0;
         int m_SpotLightIndex = 0;
         
         bool m_ShadowMapCaptured = false;
-        bool m_UseDeffered = false;
+        bool m_UseDeffered = true;
         
         int m_ShadowMapResolution = 1024;
         std::vector<bool> m_PointLightsNeedCapture;
@@ -44,6 +43,13 @@ namespace  Engine
         Object m_RenderRect;
         
         uint32_t m_SSAONoiseTexture = 0;
+        uint32_t m_FRBackgroundTexture = 0;
+        
+        uint32_t m_IBLIrradianceTexture = 0;
+        uint32_t m_IBLRadianceTexture = 0;
+        uint32_t m_IBLBRDFLUT = 0;
+        
+        glm::vec3 m_CameraPosition = glm::vec3(0.0f, 0.0f, 0.0f);
         
         void BlockModelInternal(Model* model) {model->BindShader(nullptr); model->DisableLight();}
         void BlockObjectInternal(Object* object) {object->m_Material.BindShader(nullptr);object->DisableLight();}
@@ -55,27 +61,32 @@ namespace  Engine
         void ForwardRenderInternal(const Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
         void DeferredRenderInternal(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
     public:
-        PhongLight(uint16_t renderResolutionX, uint16_t renderResolutionY, int shadowMapResolution = 1024, bool bDeffered = false);
+        PBRPipeline(uint16_t renderResolutionX = 1920, uint16_t renderResolutionY = 1080, int shadowMapResolution = 1024, bool bDeffered = true);
         
-        virtual void TurnOn(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
-        virtual void TurnOff(Renderer& renderer) const;
+        void TurnOn(Renderer& renderer, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
+        void TurnOff(Renderer& renderer) const;
         
+        void ConfigIBLLight(const std::string& irradiance, const std::string& radiance, const std::string& brdf);
+        void EnableIBLLight();
+        void DisableIBLLight();
         
-        void ConfigDirectionLight(const vec3& direction, const vec3& ambient, const vec3& diffuse, const vec3& specular);
+        void ConfigDirectionLight(const vec3& direction, const vec3& color);
         void EnableDirectionLight();
         void DisableDirectionLight();
         
-        bool AddPointLight(const vec3& position, const vec3& ambient, const vec3& diffuse, const vec3& specular, float constant = 1.0f, float linear = 0.0f, float quadratic = 0.0f);
+        void AddSkyBox(SkyBox* skyBox) { m_SkyBox = skyBox;}
+        
+        bool AddPointLight(const vec3& position, const vec3& color, float constant = 1.0f, float linear = 0.0f, float quadratic = 0.0f);
         bool ConfigPointLightPosition(int index, const vec3& position);
-        bool ConfigPointLightColor(int index, const vec3& ambient, const vec3& diffuse, const vec3& specular);
+        bool ConfigPointLightColor(int index, const vec3& color);
         bool ConfigPointLightAttenuation(int index, float constant, float linear, float quadratic);
         
-        bool AddSpotLight(const vec3& position, const vec3& direction, const vec3& ambient, const vec3& diffuse, const vec3& specular, float innerAngle, float outterAngle, float constant = 1.0f, float linear = 0.0f, float quadratic = 0.0f);
+        bool AddSpotLight(const vec3& position, const vec3& direction, const vec3& color, float innerAngle, float outterAngle, float constant = 1.0f, float linear = 0.0f, float quadratic = 0.0f);
         bool ConfigSpotLightPosition(int index, const vec3& position);
         bool ConfigSpotLightDirection(int index, const vec3& direction);
         bool ConfigSpotLightAttenuation(int index, float constant, float linear, float quadratic);
-        bool ConfigSpotLightColor(int index, const vec3& ambient, const vec3& diffuse, const vec3& specular);
-        bool ConfitSpotLightScale(int index, float innerAngle, float outterAngle);
+        bool ConfigSpotLightColor(int index, const vec3& color);
+        bool ConfitSpotLightScale(int index, float innerAngle, float outerAngle);
         
         void ConfigMVPMatrix(const glm::mat4& modelMatrix, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
         void ConfigNormalMatrix(const glm::mat3& normalMatrix);

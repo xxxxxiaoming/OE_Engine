@@ -34,6 +34,41 @@ static void BindKeys(Engine::CameraController& camController)
 	camController.BindKey(Engine::Operations::LookRight, GLFW_KEY_RIGHT);
 }
 
+static void ConfigPBRLight(Engine::PBRPipeline& pipeline, const Engine::vec3& pointLightWorldPosition, Engine::Camera& camera)
+{
+	/* 光照配置 */
+	pipeline.EnableDirectionLight();								// 开启方向光源
+	pipeline.ConfigDirectionLight(
+		Engine::vec3{-1.0f, -1.0f, -1.0f},
+		Engine::vec3{7.7f,7.7f,7.7f}
+		);
+	
+	pipeline.ConfigIBLLight("res/texture/irradiance.dds", "res/texture/radiance.dds", "res/texture/BRDF_LUT.png");
+	
+	// pipeline.AddPointLight(
+	// 	pointLightWorldPosition, 
+	// 	Engine::vec3{10.7f,10.7f,7.7f},
+	// 	1.0f, 0.001f, 0.0001f
+	// 	);															// 使用2个点光源
+	
+	// phongLight.AddPointLight(
+	// 	Engine::vec3{pointLightWorldPosition.x + 10.0f, pointLightWorldPosition.y, pointLightWorldPosition.z},
+	// 	Engine::vec3{0.1f, 0.1f, 0.1f}, 
+	// 	Engine::vec3{7.17f,5.0f,5.0f},
+	// 	Engine::vec3{5.5f, 5.5f, 5.5f},
+	// 	1.0f, 0.001f, 0.0001f
+	// 	);
+	
+	// glm::vec3 cameraWorldPosition = camera.GetPosition();
+	// glm::vec3 cameraLookDirection = camera.GetFront();
+	// pipeline.AddSpotLight(
+	// 	Engine::vec3{cameraWorldPosition.x, cameraWorldPosition.y, cameraWorldPosition.z},
+	// 	Engine::vec3{cameraLookDirection.x, cameraLookDirection.y, cameraLookDirection.z},
+	// 	Engine::vec3{0.7f, 0.7f, 0.7f},
+	// 	50.0f, 70.0f, 1.0f, 0.001f, 0.0001f
+	// 	);															// 使用1个聚光源
+}
+
 static void ConfigPhongLight(Engine::PhongLight& phongLight, const Engine::vec3& pointLightWorldPosition, Engine::Camera& camera)
 {
 	/* 光照配置 */
@@ -41,17 +76,17 @@ static void ConfigPhongLight(Engine::PhongLight& phongLight, const Engine::vec3&
 	phongLight.ConfigDirectionLight(
 		Engine::vec3{-1.0f, -1.0f, -1.0f},
 		Engine::vec3{0.3f,0.3f,0.3f},
-		Engine::vec3{2.7f,2.7f,2.7f},
+		Engine::vec3{1.7f,1.7f,1.7f},
 		Engine::vec3{0.1f,0.1f,0.11f}
 		);
 	
-	phongLight.AddPointLight(
-		pointLightWorldPosition, 
-		Engine::vec3{0.3f, 0.3f, 0.3f}, 
-		Engine::vec3{1.7f,1.7f,1.7f},
-		Engine::vec3{0.1f, 0.1f, 0.1f},
-		1.0f, 0.001f, 0.0001f
-		);															// 使用2个点光源
+	// phongLight.AddPointLight(
+	// 	pointLightWorldPosition, 
+	// 	Engine::vec3{0.3f, 0.3f, 0.3f}, 
+	// 	Engine::vec3{3.7f,3.7f,3.7f},
+	// 	Engine::vec3{0.1f, 0.1f, 0.1f},
+	// 	1.0f, 0.001f, 0.0001f
+	// 	);															// 使用2个点光源
 	
 	// phongLight.AddPointLight(
 	// 	Engine::vec3{pointLightWorldPosition.x + 10.0f, pointLightWorldPosition.y, pointLightWorldPosition.z},
@@ -90,20 +125,28 @@ void GenerateRocksModelMatrices(int amount, float minOrbitRadius, float maxOrbit
 	}
 }
 
-void AdvancedLighting(Engine::Renderer& renderer)
+void PBRLighting(Engine::Renderer& renderer)
 {
+	unsigned int viewportX, viewportY;
+	int viewportW, viewportH;
+	renderer.GetViewPortAll(viewportX, viewportY, viewportW, viewportH);
+	
 	/* Camera and controller */
+	// sphere camera setting
+	glm::vec3 camPostion = glm::vec3(0.0f, 0.5f, 3.0f);	  
+	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 0.5f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
 	// nanosuit camera setting
-	glm::vec3 camPostion = glm::vec3(0.0f, 100.0f, 170.0f);	  
-	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 55.0f, -100.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
+	// glm::vec3 camPostion = glm::vec3(0.0f, 100.0f, 230.0f);	  
+	// Engine::Camera cam{ camPostion, glm::vec3(0.0f, 55.0f, -100.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
 	// backpack camera setting
 	// glm::vec3 camPostion = glm::vec3(0.0f, 20.0f, 10.0f); // backpack camera setting
 	// Engine::Camera cam{ camPostion, glm::vec3(0.0f, 25.0f, -100.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
-	Engine::CameraController camController{ renderer.GetGLFWwinow(), 100.0f, 40.0f };
+	Engine::CameraController camController{ renderer.GetGLFWwinow(), 10.0f, 10.0 };
+	glm::mat4 projectionMatrix{glm::perspective(glm::radians(45.0f), static_cast<float>(viewportW) / static_cast<float>(viewportH), 0.1f, 3000.0f)};
 	
 	/* HDR render target */
 	bool bHDR = true;
-	Engine::RenderTarget renderTargetHDR{1280, 720, true};
+	Engine::RenderTarget renderTargetHDR{viewportW, viewportH, true};
 	renderTargetHDR.CreateColorAttachment();
 	renderTargetHDR.CreateRenderBuffer();
 	
@@ -114,7 +157,155 @@ void AdvancedLighting(Engine::Renderer& renderer)
 	float heightHDRRect[1] = { 2.0f };
 	std::string assetDirector{ "res/texture" };
 	
-	Engine::createRectangle(rectPos, widthHDRRect, heightHDRRect, vertices, indices);
+	Engine::createRectangle(rectPos, widthHDRRect, heightHDRRect, vertices, indices, 1);
+	Engine::Object rectObj{ vertices, indices, 4, 6, assetDirector };
+	rectObj.DisableLight();
+	
+	std::string vsShaderPathRect = "res/shader/FBVSShader.vert";
+	std::string fsShaderPathRect = "res/shader/FSHDR.frag";
+	Engine::Shader shaderRect{ vsShaderPathRect, fsShaderPathRect };
+	Engine::Material matForRect;
+	matForRect.BindShader(&shaderRect);
+	shaderRect.SetUniform1f("u_Exposure", exposure);
+	shaderRect.SetUniform1i("u_HDR", bHDR);
+	
+	/* Bind keys */
+	BindKeys(camController);
+
+	/* Possess camera */
+	camController.PossessCamera(&cam);
+	
+	/* PBR Pipeline */
+	Engine::PBRPipeline pbrPipeline{static_cast<uint16_t>(viewportW), static_cast<uint16_t>(viewportH), 1024, true};
+	Engine::vec3 pointLightPosition{30.0f, 70.0f, 0.0f};
+	ConfigPBRLight(pbrPipeline, pointLightPosition, cam);
+	
+	/* Shadow Map */
+	glm::vec3 shadowMapCamLookAt = glm::vec3(0.0f, 0.0f, 0.0f); // 精准瞄准 Porsche 911
+	glm::vec3 shadowMapCaptureCamPos = shadowMapCamLookAt + glm::vec3(1.7f, 1.7f, 1.7f); // 把光源相机拉近
+	
+	pbrPipeline.DisableDirectionLight();
+	pbrPipeline.EnableIBLLight();
+	// pbrPipeline.DisableIBLLight();
+	
+	// 将投影矩阵的宽高大幅度缩小到 300x300，让 1024 贴图的像素密度暴增！
+	pbrPipeline.ConfigShadowMapCaptureView(
+		shadowMapCaptureCamPos, 
+		shadowMapCamLookAt, 
+		-2.5f, 2.5f, // Left, Right (宽度缩减到200)
+		-2.5f, 2.5f, // Bottom, Top (高度缩减到200)
+		0.1f, 500.0f    // Near, Far
+	);
+	// pbrPipeline.ConfigShadowMapPointCaptureView(
+	// 	0,
+	// 	glm::vec3{pointLightPosition.x, pointLightPosition.y, pointLightPosition.z},
+	// 	90,
+	// 	1.0,
+	// 	0.1f, 2000.0f
+	// );
+	
+	// Engine::Object sphere;
+	// CreatePBRMaterialSphere(sphere);
+	// pbrPipeline.AddObject("sphere", &sphere);
+	
+	Engine::Object floor;
+	Engine::Model porsche_911;
+	Engine::SkyBox skyBox;
+	CreatePBRScene(floor, porsche_911, skyBox);
+	
+	pbrPipeline.AddObject("floor", &floor);
+	pbrPipeline.AddModel("porsche_911", &porsche_911);
+	// pbrPipeline.AddSkyBox(&skyBox);
+	
+	double lastFrameTime = glfwGetTime();
+	while (!renderer.CheckWindowShouldClose())
+	{
+		double thisFrameTime = glfwGetTime();
+		double deltaTime = thisFrameTime - lastFrameTime;
+		lastFrameTime = thisFrameTime;
+		
+		camController.ProcessInput(static_cast<float>(deltaTime));
+		ProcessInput(renderer, deltaTime);
+		
+		glm::mat4 viewMat = cam.GetViewMatrix();
+		glm::vec3 camPosRealTime = cam.GetPosition();
+		glm::vec3 camFrontRealTime = cam.GetFront();
+		
+		pbrPipeline.ConfigCameraWorldPosition(camPosRealTime);
+		
+		/* 每帧更新聚光源的位置，模拟控制手电筒^-^ */
+		pbrPipeline.ConfigSpotLightPosition(0, Engine::vec3{camPosRealTime.x, camPosRealTime.y, camPosRealTime.z});
+		pbrPipeline.ConfigSpotLightDirection(0, Engine::vec3{camFrontRealTime.x, camFrontRealTime.y, camFrontRealTime.z});
+		
+		if (bHDR)
+		{
+			renderTargetHDR.BindFramebuffer();
+		
+			renderer.OnRender();
+		
+			/* Draw Scene */
+			pbrPipeline.TurnOn(renderer, viewMat, projectionMatrix);
+			pbrPipeline.TurnOff(renderer);
+		
+			renderTargetHDR.UnbindFramebuffer();
+		
+			renderer.OnRender();
+		
+			matForRect.UseMaterial();
+			// uint32_t texture = renderTargetHDR.GetTextureBuffer();
+			uint32_t texture = pbrPipeline.GetFinalRenderTarget().GetTextureBuffer();
+			glBindTextureUnit(10, texture);
+			
+			shaderRect.SetUniform1i("u_Diffuse", 10);
+			shaderRect.SetUniform1f("u_Exposure", exposure);
+			rectObj.OnDraw();
+			renderer.DrawElements(rectObj.GetIndexCount(), nullptr);
+		
+			renderer.Render();
+		}
+		else
+		{
+			renderer.OnRender();
+		
+			/* Draw Scene */
+			pbrPipeline.TurnOn(renderer, viewMat, projectionMatrix);
+			pbrPipeline.TurnOff(renderer);
+		
+			renderer.Render();
+		}
+	}
+}
+
+#ifdef BLING_PHONG_PIPELINE
+void AdvancedLighting(Engine::Renderer& renderer)
+{
+	unsigned int viewportX, viewportY;
+	int viewportW, viewportH;
+	renderer.GetViewPortAll(viewportX, viewportY, viewportW, viewportH);
+	
+	/* Camera and controller */
+	// nanosuit camera setting
+	glm::vec3 camPostion = glm::vec3(0.0f, 100.0f, 230.0f);	  
+	Engine::Camera cam{ camPostion, glm::vec3(0.0f, 55.0f, -100.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
+	// backpack camera setting
+	// glm::vec3 camPostion = glm::vec3(0.0f, 20.0f, 10.0f); // backpack camera setting
+	// Engine::Camera cam{ camPostion, glm::vec3(0.0f, 25.0f, -100.0f), glm::vec3(0.0f, 1.0f, 0.0f) };
+	Engine::CameraController camController{ renderer.GetGLFWwinow(), 100.0f, 40.0f };
+	
+	/* HDR render target */
+	bool bHDR = true;
+	Engine::RenderTarget renderTargetHDR{viewportW, viewportH, true};
+	renderTargetHDR.CreateColorAttachment();
+	renderTargetHDR.CreateRenderBuffer();
+	
+	Engine::vec3 rectPos[1] = { Engine::vec3{-1.0f, -1.0f, 0.0f} };
+	Engine::Vertex vertices[4];
+	uint32_t indices[6];
+	float widthHDRRect[1] = { 2.0f };
+	float heightHDRRect[1] = { 2.0f };
+	std::string assetDirector{ "res/texture" };
+	
+	Engine::createRectangle(rectPos, widthHDRRect, heightHDRRect, vertices, indices, 1);
 	Engine::Object rectObj{ vertices, indices, 4, 6, assetDirector };
 	
 	rectObj.DisableLight();
@@ -134,7 +325,7 @@ void AdvancedLighting(Engine::Renderer& renderer)
 	camController.PossessCamera(&cam);
 	
 	/* Phong Light */
-	Engine::PhongLight phongLight{1024, true};
+	Engine::PhongLight phongLight{static_cast<uint16_t>(viewportW), static_cast<uint16_t>(viewportH), 1024, true};
 	Engine::vec3 pointLightPosition{-10.0f, 170.0f, -30.0f};
 	ConfigPhongLight(phongLight, pointLightPosition, cam);
 	
@@ -142,7 +333,7 @@ void AdvancedLighting(Engine::Renderer& renderer)
 	glm::vec3 shadowMapCamLookAt = glm::vec3(0.0f, 0.0f, -70.0f); // 精准瞄准 Nanosuit
 	glm::vec3 shadowMapCaptureCamPos = shadowMapCamLookAt + glm::vec3(150.0f, 150.0f, 150.0f); // 把光源相机拉近
 	
-	phongLight.DisableDirectionLight();
+	// phongLight.DisableDirectionLight();
 
 	// 将投影矩阵的宽高大幅度缩小到 300x300，让 1024 贴图的像素密度暴增！
 	phongLight.ConfigShadowMapCaptureView(
@@ -152,13 +343,13 @@ void AdvancedLighting(Engine::Renderer& renderer)
 		-150.0f, 150.0f, // Bottom, Top (高度缩减到300)
 		0.1f, 500.0f    // Near, Far
 	);
-	phongLight.ConfigShadowMapPointCaptureView(
-		0,
-		glm::vec3{pointLightPosition.x, pointLightPosition.y, pointLightPosition.z},
-		90,
-		1.0,
-		0.1f, 2000.0f
-	);
+	// phongLight.ConfigShadowMapPointCaptureView(
+	// 	0,
+	// 	glm::vec3{pointLightPosition.x, pointLightPosition.y, pointLightPosition.z},
+	// 	90,
+	// 	1.0,
+	// 	0.1f, 2000.0f
+	// );
 	
 	Engine::Object floor, wall, glass;
 	Engine::Model nanoSuit;
@@ -170,7 +361,7 @@ void AdvancedLighting(Engine::Renderer& renderer)
 	// phongLight.AddObject("glass", &glass);
 	phongLight.AddModel("nanosuit", &nanoSuit);
 	
-	glm::mat4 projectionMatrix{glm::perspective(glm::radians(45.0f), 640.0f / 360.0f, 0.1f, 3000.0f)};
+	glm::mat4 projectionMatrix{glm::perspective(glm::radians(45.0f), static_cast<float>(viewportW) / static_cast<float>(viewportH), 0.1f, 3000.0f)};
 	
 	double lastFrameTime = glfwGetTime();
 	while (!renderer.CheckWindowShouldClose())
@@ -387,7 +578,7 @@ void RenderTargetExperiment(Engine::Renderer& renderer)
 	float height[1] = { 2.0f };
 	std::string assetDirector{ "res/texture" };
 	
-	Engine::createRectangle(rectPos, width, height, vertices, indices);
+	Engine::createRectangle(rectPos, width, height, vertices, indices, 1);
 	Engine::Object rectObj{ vertices, indices, 4, 6, assetDirector };
 	
 	rectObj.DisableLight();
@@ -610,3 +801,4 @@ void DrawASimpleHouseUsingGS(Engine::Renderer& renderer)
 	houseObject.Destroy();
 	houseShader.Delete();
 }
+#endif

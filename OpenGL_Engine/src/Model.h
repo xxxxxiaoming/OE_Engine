@@ -1,5 +1,4 @@
 ﻿#pragma once
-#include <glad/glad.h>
 #include <string>
 #include <vector>
 #include <assimp/Importer.hpp>
@@ -16,11 +15,12 @@ namespace Engine
 		std::string name;
 		std::vector<Object> objects;
 		uint8_t indicesPerFace;
+		glm::mat4 localTransform{1.0f};
 
 		Part(const aiNode* node, const aiScene* scene, uint8_t indicesOfOneFace, std::string& assetDirectory, std::string& format);
 		~Part();
 		
-		void ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& assetDirectory, std::string& format);
+		void ProcessMesh(aiMesh* mesh, const aiScene* scene, std::string& assetDirectory, std::string& format, const aiNode* node);
 		void DestroyPart();
 	private:
 		bool m_Destroyed = false;
@@ -38,7 +38,7 @@ namespace Engine
 
 		// TODO: Link parts?
 		// void LinkParts();
-		void ProcessNode(const aiNode* node, const aiScene* scene, std::string& assetDirectroy, std::string& format);
+		void ProcessNode(const aiNode* node, const aiScene* scene, const glm::mat4& parentTransform, std::string& assetDirectroy, std::string& format);
 		void GetChildrenNum(aiNode* node, uint32_t& count);
 
 	public:
@@ -46,16 +46,29 @@ namespace Engine
 		
 		Model();
 		Model(const std::string& path, bool FlipUV = true, const Transform& transform = Transform());
-		~Model();
+		~Model(); 
 		
 		Model& operator()(const std::string& path, bool bFlipUV = true, const Transform& transform = Transform());
 
 		void Destroy();
 
 		void BindShader(Shader* shader);
+		
+#ifdef PBR_PIPELINE
+		
+		void BindAlbedoSlot(int* slots, int slotsNum);
+		void BindMetallicSlots(int* slots, int slotsNum);
+		void BindRoughnessSlots(int* slots, int slotsNum);
+		void BindAOSlots(int* slots, int slotsNum);
+		
+#elif BLING_PHONT_PIPELINE
+		
 		void BindAmbientSlot(int* slots, int slotsNum);
 		void BindDiffuseSlot(int* slots, int slotsNum);
 		void BindSpecularSlot(int* slots, int slotsNum);
+		
+#endif
+		
 		void BindNormalSlot(int* slots, int slotsNum);
 		void Draw(const Renderer& renderer);
 		void DrawInstanced(const Renderer& renderer, uint32_t amount);
