@@ -68,8 +68,8 @@ void main()
     //normalVec = normalize(v_N);
 
     gN = normalVec * 0.5 + 0.5;
-    gAlbedo = vec4(texture(u_Material.albedo, v_TexCoord).rgb, 1.0) * u_Material.albedoFactor;
-    gEmissive = vec4(texture(u_Material.emissive, v_TexCoord).rgb, 1.0);
+    gAlbedo = vec4(pow(texture(u_Material.albedo, v_TexCoord).rgb, vec3(2.2)), 1.0) * u_Material.albedoFactor;
+    gEmissive = vec4(pow(texture(u_Material.emissive, v_TexCoord).rgb, vec3(2.2)), 1.0);
     gMetallicRoughnessAO = u_UseMRA ? 
                            vec4(texture(u_Material.metallic, v_TexCoord).b * u_Material.metallicFactor, texture(u_Material.roughness, v_TexCoord).g * u_Material.roughnessFactor, texture(u_Material.AO, v_TexCoord).r, 1.0) 
                            : vec4(texture(u_Material.metallic, v_TexCoord).r * u_Material.metallicFactor, texture(u_Material.roughness, v_TexCoord).r * u_Material.roughnessFactor, texture(u_Material.AO, v_TexCoord).r, 1.0);
@@ -350,9 +350,6 @@ void main()
     vec3 albedo = texture(u_AlbedoMap, v_TexCoord).rgb;
     vec3 emissive = texture(u_EmissiveMap, v_TexCoord).rgb;
     vec3 light = vec3(0.0, 0.0, 0.0);
-
-    albedo = pow(albedo, vec3(2.2));
-    emissive = pow(emissive, vec3(2.2));
     
     float metallic = texture(u_MetallicRoughnessAOMap, v_TexCoord).r;
     float roughness = texture(u_MetallicRoughnessAOMap, v_TexCoord).g;

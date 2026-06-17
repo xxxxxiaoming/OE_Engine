@@ -286,7 +286,7 @@ LightCombination calcSpotLight(vec3 albedo, float metallic, float roughness, vec
 }
 
 void main() {
-    vec4 albedoTex = texture(u_Material.albedo, v_TexCoord) * u_Material.albedoFactor;
+    vec4 albedoTex = vec4(pow(texture(u_Material.albedo, v_TexCoord).rgb, vec3(2.2)), texture(u_Material.albedo, v_TexCoord).a) * u_Material.albedoFactor;
     vec3 albedo = albedoTex.rgb;
     float alpha = albedoTex.a;
 
@@ -294,7 +294,7 @@ void main() {
     float roughness = (u_UseMRA ? texture(u_Material.roughness, v_TexCoord).g: texture(u_Material.roughness, v_TexCoord).r) * u_Material.roughnessFactor;
     float ao = texture(u_Material.AO, v_TexCoord).r;
     float transmission = texture(u_Material.transmission, v_TexCoord).r * u_Material.transmissionFactor;
-    vec3 emissive = texture(u_Material.emissive, v_TexCoord).rgb;
+    vec3 emissive = pow(texture(u_Material.emissive, v_TexCoord).rgb, vec3(2.2));
     
     LightCombination directionLight;
     LightCombination pointLight;
@@ -309,9 +309,7 @@ void main() {
     spotLight.diffuse = vec3(0.0);
     spotLight.specular = vec3(0.0);
 
-    // gamma correction
-    albedo = pow(albedo, vec3(2.2));
-    emissive = pow(emissive, vec3(2.2));
+    // gamma correction (moved to texture sampling)
 
     vec3 specularLight = vec3(0.0);
     vec3 diffuseLight = vec3(0.0);
