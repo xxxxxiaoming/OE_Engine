@@ -22,6 +22,9 @@
 > [!WARNING]
 > 当前为**初代版本**，仍存在许多已知问题和待优化之处，将在后续持续迭代改进。
 
+> [!CAUTION]
+> **macOS 不受支持**：本项目重度使用了 OpenGL 4.5 的 DSA (Direct State Access) 特性。由于 Apple 已停止更新 OpenGL 且最高仅支持至 OpenGL 4.1，该项目在 macOS 下虽能编译，但会在运行时因调用缺失 API 而崩溃。请在 Windows (或 Linux) 环境下运行本项目。
+
 ---
 
 ## ✨ 渲染特性

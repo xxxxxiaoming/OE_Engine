@@ -22,6 +22,9 @@ The project consists of two main parts:
 > [!WARNING]
 > This is an **early version** with many known issues and areas for improvement. It will be continuously iterated and refined.
 
+> [!CAUTION]
+> **macOS is NOT supported**: This project heavily relies on OpenGL 4.5 DSA (Direct State Access) features. Since Apple deprecated OpenGL and maxes out at OpenGL 4.1, compiling and running this project on macOS will result in a runtime crash due to missing API functions. Please run this project on Windows (or Linux).
+
 ---
 
 ## ✨ Rendering Features
